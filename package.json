@@ -1,5 +1,5 @@
 {
-  "name": "nextjs-starter-fullstack-node",
+  "name": "zenith-crown-academy-v0",
   "version": "2.0.0",
   "private": true,
   "type": "module",
@@ -57,7 +57,7 @@
     "node": ">=24.x.x",
     "npm": ">=11.x.x"
   },
-  "author": "Saikat Sardar",
+  "author": "Nisha Sardar",
   "license": "MIT",
-  "homepage": "https://github.com/MrSaikatS/nextjs-starter-fullstack-node#readme"
+  "homepage": "https://github.com/MissNishaSardar/zenith-crown-academy-v0"
 }
