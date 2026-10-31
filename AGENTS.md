@@ -20,6 +20,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | Base UI React | ^1.7               | Primitive provider for shadcn components (e.g., `@base-ui/react/button`)                                                                                             |
 | Tailwind CSS  | ^4.3               | `@tailwindcss/postcss` plugin, `tw-animate-css`, `shadcn/tailwind.css`                                                                                               |
 | Zod           | ^4.5               | Schema validation                                                                                                                                                    |
+| better-auth   | ^1.7               | Auth: `src/lib/auth.ts` (server), `src/lib/auth-client.ts` (react client), routes mounted at `src/app/api/auth/[...all]/route.ts`                                    |
 | env           | @t3-oss/env-nextjs | Split: `src/lib/env/serverEnv.ts` + `clientEnv.ts`                                                                                                                   |
 
 Path aliases: `@/*` → `./src/*`, `@generated/*` → `./generated/*`.
@@ -149,6 +150,12 @@ git commit -m @"
 <commit message here>
 "@
 ```
+
+## Better Auth
+
+- Schema lives in `prisma/schema.prisma` (generated models: `User`, `Session`, `Account`, `Verification`, each `@@map`ped to lowercase tables). Apply changes with the project `migrate` script, never `auth migrate` (unsupported for the Prisma adapter).
+- `bunx auth generate` is interactive: pass `--output prisma/schema.prisma -y`. It does not load `.env`, so set `DATABASE_URL` and `BETTER_AUTH_SECRET` inline for that command.
+- Re-run generate + migrate after adding Better Auth plugins.
 
 ## Agent orchestration and token efficiency
 
