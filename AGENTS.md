@@ -24,7 +24,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 Path aliases: `@/*` → `./src/*`, `@generated/*` → `./generated/*`.
 
-Engines: Node >= 24, npm >= 11.
+Engines: Node >= 24, bun >= 1.4. Package manager: bun.
 
 ## Scripts
 
@@ -40,11 +40,17 @@ Engines: Node >= 24, npm >= 11.
 
 ## Agent behavior
 
-- **Ask questions** when ambiguous or before destructive actions. Ask one question at a time. An earlier answer can change what the remaining questions should be.
+- **Ask questions when ambiguous or before destructive actions.** Ask one question at a time, one question per turn, so each answer is clear and nothing gets confused or skipped. Before asking, explain in simple words why the answer is needed. When the topic could touch related files, point out the files that need the same modification or that share the key logic flow, and ask about them in the same question when possible. Wait for the user's answer and confirmation before spending tokens on the topics that depend on it. An earlier answer can change what the remaining questions should be.
 - **Use your full toolkit**: Reach for `websearch`, `webfetch`, and any other available tools whenever they improve correctness. Do not answer from memory what a live tool can verify. Use `rg` (ripgrep) for file and content searches in the shell when it is installed.
 - **Decisions between options**: When a choice exists, evaluate all options first, pick the best one, then ask the user with every option listed (chosen one included and marked) before proceeding. Never silently pick one.
 - **Update this file** when you discover non-obvious gotchas, fixes, or conventions.
 - **Use skills + MCPs** before writing code matching `prisma-*`, `next-*`, `better-auth-*`, `zod`, etc. Use `shadcn` MCP for component add/search/audit. Use `better-auth` MCP for auth docs.
+- **Review with docs verification**: whenever the user asks for a review, or a pre build review such as the /review command, run /review. Then verify the touched code against the latest official documentation, Prisma through the prisma skills, better-auth through its MCP docs search resolved to the installed version, and Next.js through the guides in `node_modules/next/dist/docs/`. The review must identify structural issues, problematic areas, and duplicated code, and report all findings before a build proceeds.
+- **Package manager**: always use bun (`bun install`, `bun run <script>`, `bunx <tool>`). Never npm, yarn, or pnpm. Keep `bun.lock` in sync when dependencies change.
+- **Never abandon in progress work**: when the user sends new information or a new task during ongoing work, do not drop the earlier build and jump to the newest request. Note the new input, fold it into the plan, and finish everything step by step in order: complete the current step, then the next, then apply the addition. Nothing is left half built unless the user explicitly confirms dropping it or changing the priority. For an urgent or conflicting addition, ask how to order the work instead of silently deciding.
+- **Revise all plans before building**: when plan mode is used and a build is about to start, do not jump straight into code. First reread every plan made in this session, recheck each item, and confirm no planned part was skipped or missed. Only begin the build once the full plan list checks out, and state the final revised plan before starting.
+- **Mocks are temporary HTML**: whenever the user asks for a mock, create temporary HTML files under the project and point to them so the result can be viewed directly in the browser. After the mock is approved and the real build is finished, delete the temporary mock files so nothing is left behind.
+- **Propagate issue fixes**: when the user reports an issue or asks for a fix, do not fix only the reported spot. First search the rest of the project for the same or a similar issue in related files, inform the user about every location where it also exists, then fix all of them together in one pass unless the user says otherwise.
 
 ## Verification
 
@@ -56,6 +62,9 @@ Engines: Node >= 24, npm >= 11.
 - **Click-testing**: Prefer CLI-driven click-testing against the running dev server.
 - **Artifacts**: Snapshots, console logs, and screenshots land in `.playwright-cli/`, which is gitignored.
 - **Cheat-sheet**: Maintain `playwright-cli.md` at the repo root, a running record of UI element names, routes, form shapes, and flow gotchas discovered while testing. Consult it before scanning snapshots, and append new learnings as they are discovered.
+- **Post build verification**: after finishing any build or feature, always run playwright-cli against the running dev server to confirm what was built actually renders and works, not only that the code compiles. State the result of this check before handing the work back.
+- **Layout hygiene**: while verifying, inspect the screenshots for unwanted spacing. No unusual empty or dead spaces, no stray double spaces in text, and no uneven margins or padding may appear. Fix every spacing problem found, with consistent tailwind spacing utilities, and recheck before handing back.
+- **No loose ends**: a build is complete only when nothing is dangling. Before handing any work back, review every touched file and confirm there are no TODO placeholders, no unused imports or variables, no empty or unhandled states, no broken imports or dead routes, no leftover console logs or throwaway files, and no temporary mock files still present. Every new feature must be reachable, fully wired up, and working end to end.
 
 ## Project structure
 
@@ -124,6 +133,13 @@ Each field goes through `Controller`:
 
 Submit: `<form onSubmit={handleSubmit(handler)} noValidate>`. Button disabled while submitting with icon toggle.
 
+## Button behavior
+
+- **Real disabled logic**: whenever a button needs to be disabled, implement proper disabled logic through the `disabled` attribute tied to the relevant state, never visual only styling.
+- **Edit buttons**: every edit or save button must be disabled while `!hasChanged`, staying inactive until the user actually changes something. Track this with `formState.isDirty` from react-hook-form or an explicit `hasChanged` flag.
+- **Spinning loader**: an acting button shows a spinning loader for about 1500ms. When there is no real async operation, provide an equivalent minimum delay so the loading state is perceivable instead of flashing for an instant.
+- **Baseline, not the limit**: these are minimum button behaviors, not exclusions. Other UI effects and micro interactions are still allowed on top of them.
+
 ## Git commits
 
 Use PowerShell here-strings:
@@ -133,3 +149,16 @@ git commit -m @"
 <commit message here>
 "@
 ```
+
+## Agent orchestration and token efficiency
+
+The main agent is the brain. Subagents are workers with fresh context and no memory of the conversation. Act directly only when urgent; delegate everything else.
+
+- **Delegate heavily**: launch the maximum useful number of subagents, batched in parallel whenever tasks are independent. Use background mode for slow independent work.
+- **Self contained prompts**: every subagent prompt includes the goal, context, file paths, constraints, and the exact output expected. Workers see nothing else.
+- **Tight worker prompts**: no fluff. Workers return short structured summaries, never raw dumps of file contents or logs.
+- **Right thoroughness**: use Explore with quick thoroughness for simple lookups, deeper thoroughness only for genuinely complex questions.
+- **Batch spawn overhead**: combine related questions into a single worker call instead of many small spawns.
+- **Act directly only for**: tiny one line edits where spawning costs more than the fix, a single small file read needed to plan, and destructive or hard to reverse actions (always confirm those with the user first).
+- **No re-reads**: never re-read files already covered by a worker summary. Keep replies concise.
+- **Fresh sessions**: for a new unrelated task, recommend starting a new session so the old context does not keep being resent every turn.
