@@ -42,6 +42,8 @@ Engines: Node >= 24, bun >= 1.4. Package manager: bun.
 ## Agent behavior
 
 - **Ask questions when ambiguous or before destructive actions.** Ask one question at a time, one question per turn, so each answer is clear and nothing gets confused or skipped. Before asking, explain in simple words why the answer is needed. When the topic could touch related files, point out the files that need the same modification or that share the key logic flow, and ask about them in the same question when possible. Wait for the user's answer and confirmation before spending tokens on the topics that depend on it. An earlier answer can change what the remaining questions should be.
+- **Plan mode is binding**: while a session runs as the Plan agent, stay read-only. Never bypass Plan mode by routing edits or commands through subagents, since child sessions start fresh and run without Plan-mode tool restrictions. Implement only after the user actually switches to the build agent, even if they say proceed. Tell them to switch instead of implementing.
+- **Ask before touching anything outside the project**: never write, create, or delete any file or folder outside the repo directory, including global config such as `C:\Users\USER\AGENTS.md` or `C:\Users\USER\.config\opencode\AGENTS.md`, unless the user has explicitly approved that exact path in the current session. Tool-owned caches from bunx, Playwright browsers, and the Next.js build are exempt since they are standard tooling storage, not content changes. Nothing leaves the working tree through a commit or push without an explicit request from the user.
 - **Use your full toolkit**: Reach for `websearch`, `webfetch`, and any other available tools whenever they improve correctness. Do not answer from memory what a live tool can verify. Use `rg` (ripgrep) for file and content searches in the shell when it is installed.
 - **Decisions between options**: When a choice exists, evaluate all options first, pick the best one, then ask the user with every option listed (chosen one included and marked) before proceeding. Never silently pick one.
 - **Update this file** when you discover non-obvious gotchas, fixes, or conventions.
@@ -57,9 +59,9 @@ Engines: Node >= 24, bun >= 1.4. Package manager: bun.
 
 - **Primary**: `bun run lint`, eslint only. This is the default check.
 - **Heavy gates**: `bun lint:check` runs `next typegen`, `tsc --noEmit`, and `eslint`. `bun run build` runs `prisma generate && next build`. Use these only when requested or when playwright-cli testing fails, since the dev server already runs typegen and typechecks during browser verification.
-- **Browser**: Use `playwright-cli` for UI verification, via `bunx playwright-cli` if it is not installed. Enumerate capabilities with `playwright-cli --help`.
-- **Headed mode**: Always run visible with `--headed`, e.g. `playwright-cli open --headed ...`.
-- **Look at the page**: The agent has vision. Use `playwright-cli screenshot` and actually inspect layout, badges, dialogs, and styling. Do not rely on accessibility snapshots alone.
+- **Browser**: Use `@playwright/cli` via `bunx @playwright/cli` (the old `playwright-cli` package is deprecated and errors with "could not determine executable"). The CLI blocks `file:` URLs, so test over http: run `bun run dev` and browse `http://localhost:3000`, or serve a static preview with e.g. `bunx serve -l 4599 .` from the repo root and browse `http://localhost:4599/<path>`. Enumerate capabilities with `bunx @playwright/cli --help`.
+- **Headed mode**: Always run visible with `--headed`, e.g. `bunx @playwright/cli open --headed ...`.
+- **Look at the page**: The agent has vision. Use `bunx @playwright/cli screenshot` and actually inspect layout, badges, dialogs, and styling. Do not rely on accessibility snapshots alone.
 - **Click-testing**: Prefer CLI-driven click-testing against the running dev server.
 - **Artifacts**: Snapshots, console logs, and screenshots land in `.playwright-cli/`, which is gitignored.
 - **Cheat-sheet**: Maintain `playwright-cli.md` at the repo root, a running record of UI element names, routes, form shapes, and flow gotchas discovered while testing. Consult it before scanning snapshots, and append new learnings as they are discovered.
@@ -96,6 +98,7 @@ public/uploads/     # User uploads (all files ignored except .gitkeep)
 
 - **Functions**: Always use arrow functions (`const foo = () => {}`), never `function` declarations. Exception: `src/components/shadcnui/` keeps its generated style.
 - **No em dashes**: Never use em dashes in prose, comments, or docs. Use periods or commas instead. Also avoid parentheses, en dashes, and hyphens as dash substitutes.
+- **Tailwind class sorting**: files written through opencode get auto-formatted by `prettier-plugin-tailwindcss`, which reorders `className` strings. After writing a file, reread it before the next edit and match the sorted order, or the edit fails to match.
 
 ## Key restrictions
 
