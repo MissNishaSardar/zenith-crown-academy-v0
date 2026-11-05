@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import SilkBackground from "@/components/Layout/SilkBackground";
 import ThemeProvider from "@/components/Providers/ThemeProvider";
-import Header from "@/components/Layout/Header";
 import { clientEnv } from "@/lib/env/clientEnv";
 import { geistMono, geistSans, interHeading } from "@/lib/fonts";
 import { LayoutProps } from "@/lib/types";
@@ -44,7 +43,6 @@ const RootLayout = ({ children }: LayoutProps) => {
           attribute={"class"}
           defaultTheme="dark"
           enableSystem={false}>
-          <Header />
           {children}
         </ThemeProvider>
       </body>

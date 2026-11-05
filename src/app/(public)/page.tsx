@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import { CrownIcon } from "lucide-react";
 
-const page = () => {
+export const metadata: Metadata = {
+  title: { absolute: "Zenith Crown Academy" },
+};
+
+const Page = () => {
   return (
     <main className="flex min-h-[calc(100svh-4rem)] flex-col items-center justify-center px-6 py-16 text-center">
       <Image
@@ -31,4 +36,4 @@ const page = () => {
   );
 };
 
-export default page;
+export default Page;

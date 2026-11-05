@@ -159,6 +159,10 @@ git commit -m @"
 - Schema lives in `prisma/schema.prisma` (generated models: `User`, `Session`, `Account`, `Verification`, each `@@map`ped to lowercase tables). Apply changes with the project `migrate` script, never `auth migrate` (unsupported for the Prisma adapter).
 - `bunx auth generate` is interactive: pass `--output prisma/schema.prisma -y`. It does not load `.env`, so set `DATABASE_URL` and `BETTER_AUTH_SECRET` inline for that command.
 - Re-run generate + migrate after adding Better Auth plugins.
+- Plugin order matters: custom plugins like `admin()` go BEFORE `nextCookies()`, which must stay last in the `plugins` array or cookies get dropped (server warning).
+- `bunx auth generate` regenerates `prisma/schema.prisma` from scratch: after every run, reapply the RBAC tightening on `User`: `role String @default("student")` and `banned Boolean @default(false)` (generate emits them as nullable), then migrate.
+- The admin CLI supports non interactive setup: `bunx auth create-admin --email <email> --name <name> --password <pw> --role super_admin` with env inline (`--role` accepts any slug from `src/lib/auth/permissions.ts`).
+- Admin endpoints (set-role, ban, etc.) require an `Origin` header in curl or PowerShell tests, plus a session cookie; the client plugin handles it in-app.
 
 ## Agent orchestration and token efficiency
 
