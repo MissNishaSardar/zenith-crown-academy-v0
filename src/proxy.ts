@@ -23,7 +23,11 @@ export const proxy = (request: NextRequest) => {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (isAuthedCookie && pathname === "/login") {
+  // /reset-password intentionally stays reachable with a session cookie so
+  // reset links work even with a stale cookie or while signed in.
+  const isAuthPage = pathname === "/login" || pathname === "/forgot-password";
+
+  if (isAuthedCookie && isAuthPage) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
@@ -31,5 +35,5 @@ export const proxy = (request: NextRequest) => {
 };
 
 export const config = {
-  matcher: ["/login", "/dashboard", "/dashboard/:path*"],
+  matcher: ["/login", "/forgot-password", "/dashboard", "/dashboard/:path*"],
 };

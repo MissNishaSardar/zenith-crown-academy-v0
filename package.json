@@ -10,6 +10,7 @@
     "lint": "eslint && echo \"✓ Lint passed\"",
     "lint:check": "next typegen && tsc --noEmit && echo \"✓ Type check passed\" && eslint && echo \"✓ Lint passed\"",
     "migrate": "prisma migrate dev && prisma generate",
+    "seed": "prisma db seed",
     "studio": "prisma studio --browser none"
   },
   "dependencies": {

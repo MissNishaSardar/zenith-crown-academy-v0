@@ -28,7 +28,9 @@ model User {
   banReason  String?
   banExpires DateTime?
 
+  username String?
   @@unique([email])
+  @@unique([username])
   @@map("user")
 }
 

@@ -111,3 +111,26 @@ Running record of tooling notes, UI element names, routes, and flow gotchas disc
 - Role sweep trick for untested roles: sign in the librarian account via API, `UPDATE user SET role = ?` in `prisma/dev.db` (sqlite via `node:sqlite` in `bun -e`), then fetch the target page with the session cookie; each page load reads the fresh DB role.
 - Console after the trim: only the React DevTools info line and HMR/Fast Refresh entries, zero errors or warnings.
 - Screenshots after the trim: `.playwright-cli/login-stub.png`, `.playwright-cli/student-stub-trim.png`. The pre-trim set (`dashboard-super-admin.png`, `dashboard-student-dark.png`, `dashboard-student-light.png`, `dashboard-librarian-mobile.png`, `landing-dark-restored.png`, `dashboard-librarian.png`) shows the deleted UI and survives for history.
+
+## Login mocks, 5 options (temporary, delete after build)
+
+- Files: `mockups/login/index.html`, `v1-crown-card.html`, `v2-split.html`, `v3-header-minimal.html`, `v4-zenith-art.html`, `v5-mobile-support.html`. Served from repo root with `bunx serve -l 4599 .` and browsed at `http://localhost:4599/mockups/login/`. No app file is touched until one option is picked.
+- Form shape is identical in all five so layout can be compared. Combined field is `#identifier` labelled Email or username with placeholder for email or admission number. Password is `#password` with `#toggle-password` Show and Hide button. Remember checkbox is `#remember-me` unchecked by default. Forgot link points to `/forgot-password`. Submit button is `#signin` and shows a spinner for about 1400ms in the demo script. Status line is `role=status` and states demo only with admin created accounts and no public signup.
+- Brand mark is `../../public/logo-mark.png` relative to `mockups/login/`, dark meadow palette with primary green and gold accent, Inter headings and Geist style system body. Silk folds use blurred radial gradients matching `globals.css` dark values.
+- Gotchas found in review. SVG `preserveAspectRatio="none"` stretches circles into ellipses, use `xMidYMid slice` for peak art. A split brand panel with `justify-content: space-between` leaves a large empty middle on tall viewports, centering the headline with a top pinned logo keeps the balance. Sticky bottom bars need `padding-bottom` on the shell so the footer note clears the bar, checked at 390 by 844.
+- Screenshots: index menu plus v1 centered card, v2 split, v3 header minimal, v4 zenith art, v5 mobile at 390 by 844, then v2 and v4 rechecks after the spacing and ellipse fixes.
+
+## Auth build verification (2026-11-06)
+
+- `bunx prisma migrate dev --name add_username` and `--create-only` both fail in this harness with "Prisma Migrate has detected that the environment is non-interactive". Working fallback: `bunx prisma migrate diff --from-migrations ./prisma/migrations --to-schema ./prisma/schema.prisma --script`, write the SQL to `prisma/migrations/<ts>_add_username/migration.sql`, then `bunx prisma migrate deploy` and `bunx prisma generate`. Schema tightening (`role @default("student")`, `banned @default(false)`) stays intact.
+- `react-hooks/purity` flags `Date.now()` even inside event handlers defined in a component. Fix used: move the minimum load timer to a module level `withMinimumLoad` helper outside the component. In `.tsx` the generic must be `<T,>` with trailing comma or the file fails to parse.
+- Plain `bunx tsc --noEmit` without `next typegen` reports a stale typedRoutes error for new routes (e.g. `Link href="/forgot-password"`). Always run `bun lint:check` (typegen first) or `bunx next typegen` before `tsc`.
+- `RoleSwitcher` renders a role badge (`<span>Student</span>`) for a single role and only a `<select id="role-switcher">` dropdown for multiple roles. Check the header text for the role label, not just a select element.
+- Browser login verification without a known password: create a throwaway user via `POST /api/auth/sign-up/email` (needs `Origin` header), then sign in through the real login form with email or username to prove both paths.
+- Auth screenshots from this pass: `.playwright-cli/auth-login.png`, `auth-dashboard-student.png`, `auth-forgot.png`, `auth-reset-token.png`, `auth-reset-notoken.png`. Console: 0 errors. Pre-existing warnings only: React DevTools info, HMR log, one Image aspect warning from `AuthCard` logo, one verbose password autocomplete hint on reset.
+- Seed is dev-only: `prisma/seed.ts` refuses to run when NODE_ENV=production, and re-running it no longer resets `banned`.
+
+## Login mocks deleted and header Sign in check (2026-11-06)
+
+- Deleted `mockups/login/` (all six HTML files). `mockups/` held only that folder, so the now empty parent was removed too; `git status` no longer lists `mockups/`.
+- Header `Sign in` link (`href="/login"`) sits next to `ThemeToggleButton` at both widths with no overlap. At 390 the home link and Sign in bounding boxes abut exactly (0px gap), the middle whitespace is only the inner padding, so any future header growth will collide first on mobile.
