@@ -130,7 +130,29 @@ Running record of tooling notes, UI element names, routes, and flow gotchas disc
 - Auth screenshots from this pass: `.playwright-cli/auth-login.png`, `auth-dashboard-student.png`, `auth-forgot.png`, `auth-reset-token.png`, `auth-reset-notoken.png`. Console: 0 errors. Pre-existing warnings only: React DevTools info, HMR log, one Image aspect warning from `AuthCard` logo, one verbose password autocomplete hint on reset.
 - Seed is dev-only: `prisma/seed.ts` refuses to run when NODE_ENV=production, and re-running it no longer resets `banned`.
 
+## Dashboard sidebar build (2026-11-08)
+
+- Added via `bunx --bun shadcn@latest add sidebar sheet tooltip separator -y -o`: `src/components/shadcnui/sidebar.tsx`, `sheet.tsx`, `tooltip.tsx`, `separator.tsx`, `input.tsx`, `skeleton.tsx`, `src/hooks/use-mobile.ts`. New files imported `cn from "cn"` and added a `cn` package to `package.json`. Fixed all to `from "@/lib/utils"` and removed `cn` with `bun remove cn` so the lockfile stays clean.
+- `use-mobile.ts` as shipped calls `setState` synchronously in an effect and fails `react-hooks/set-state-in-effect` on lint. Rewrote to initialize from `window.innerWidth` in `useState` and subscribe only, no sync set in the effect.
+- Shell: `src/lib/navigation.ts` holds per-role items with Lucide icon objects and `getNavGroups(storedRole)` merging dual roles plus General. `src/components/Layout/AppSidebar.tsx` is `"use client"`, `Sidebar collapsible="icon"` with logo in `SidebarHeader`, `SidebarMenuButton` with `tooltip={title}` and `render={<Link/>}` plus `closeMobile` via `setOpenMobile(false)`. No `SidebarFooter` profile. Role switching stays only in header `ProfileMenu` plus `RoleSwitcher`.
+- `DashboardShell.tsx` wraps with `TooltipProvider` plus `SidebarProvider`, then `AppSidebar` plus `SidebarInset`. `src/app/(dashboard)/layout.tsx` stays a Server Component doing `requireSession()` and passes user data down. `DashboardHeader.tsx` is slim, no logo, `SidebarTrigger` plus breadcrumb `Dashboard / {roleLabel}` plus `ThemeToggleButton` plus `ProfileMenu`. No `max-w-6xl` centering so no centered void; `SidebarInset` is full width.
+- Mobile: shadcn renders the sidebar as a `Sheet` dialog under 768px. Clicking a menu link calls `setOpenMobile(false)` so the drawer auto closes. Verified at 390 by 844: drawer opens with full labels, tapping Academic returns to the main view with the scrim cleared.
+- Collapsed icon tooltips need a wait. `hover` then wait 600ms before screenshot or the portal tooltip is missed. `run-code` with `mouse.move` plus `waitForTimeout` then `screenshot` catches it.
+- Login to verify: `bun run dev` in the background, `bunx @playwright/cli open --headed http://localhost:3000`, sign in as the seed principal `principal@gmail.com` with password equal to the email. Then `resize 1440 900` for desktop, toggle `Toggle Sidebar`, `resize 390 844` for mobile. Screenshots in `.playwright-cli/` are gitignored. Console is 0 errors with one pre-existing `logo-mark.png` aspect warning. Deleted `mockups/dashboard-sidebar.html` after the build and stopped the dev server.
+
 ## Login mocks deleted and header Sign in check (2026-11-06)
 
 - Deleted `mockups/login/` (all six HTML files). `mockups/` held only that folder, so the now empty parent was removed too; `git status` no longer lists `mockups/`.
 - Header `Sign in` link (`href="/login"`) sits next to `ThemeToggleButton` at both widths with no overlap. At 390 the home link and Sign in bounding boxes abut exactly (0px gap), the middle whitespace is only the inner padding, so any future header growth will collide first on mobile.
+
+## Logo aspect warning fix (2026-11-08)
+
+- Root cause was mismatched ratio in `AuthCard.tsx` (`108x64` vs true `954x561` at 1.7005) with `h-16 w-auto`, so rendered height matched the attribute while width did not, triggering the Next `width or height modified` warning. Fixed by using `954x561` plus `style={{ width: "auto" }}`.
+- `Header.tsx` and `src/app/(public)/page.tsx` kept `954x561` but gained `style={{ width: "auto" }}` to match the Next suggested pattern.
+- `AppSidebar.tsx` square `size-9` plus `object-contain` was replaced by a `relative size-9` wrapper with a `fill` `Image` and `sizes="36px"` plus `object-contain`, scoped to `size-8` in collapsed icon mode. The fill version with `priority` introduced a preload unused warning (`w=48`), so `priority` was removed. The final fill version preserves the square slot and 0 warnings with no text truncation.
+- Verified at 1440x900 on `/`, `/login`, and `/dashboard/principal` expanded and collapsed as the seed principal `principal@gmail.com`: console 0 errors and 0 warnings on every route, screenshots show no logo clipping, no dead space, and no duplicate labels.
+
+## Custom 404 page (2026-11-08)
+
+- Added `src/app/not-found.tsx` using the `AuthCard` card shell. The Next default 404 was near white text on the light silk and unreadable. The card uses `bg-card` with `text-card-foreground` plus `text-muted-foreground` and `text-primary` tokens, so contrast is strong in both themes.
+- Verified at 1440 by 900 in dark and light and at 390 by 844 on `/unknown-route` and `/dashboard/principal/academic` as the seed principal: title `Page not found | Zenith Crown Academy`, HTTP 404 is the only console error, 0 warnings, no aspect warning on the logo, buttons stack vertically on mobile, no overlap or dead space.

@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2Icon } from "lucide-react";
+import { Eye, EyeOff, LoaderIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -175,7 +175,7 @@ const LoginForm = () => {
         className="mt-5 h-[50px] w-full text-[15px] font-extrabold">
         {isSubmitting ?
           <>
-            <Loader2Icon
+            <LoaderIcon
               aria-hidden="true"
               className="animate-spin"
             />

@@ -15,6 +15,7 @@ const Page = () => {
         width={954}
         height={561}
         priority
+        style={{ width: "auto" }}
         className="h-36 w-auto drop-shadow-[0_20px_45px_oklch(0.258_0.036_158.6/0.3)] sm:h-44"
       />
       <h1 className="font-heading text-foreground mt-10 text-4xl font-extrabold tracking-tight sm:text-5xl">

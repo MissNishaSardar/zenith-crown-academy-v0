@@ -23,6 +23,7 @@ const Header = async () => {
             width={954}
             height={561}
             priority
+            style={{ width: "auto" }}
             className="h-9 w-auto"
           />
           <span className="font-heading text-foreground text-base leading-none font-bold tracking-tight sm:text-lg">

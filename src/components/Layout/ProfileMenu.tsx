@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2Icon, LogOutIcon } from "lucide-react";
+import { LoaderIcon, LogOutIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -62,6 +62,7 @@ const ProfileMenu = ({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const initials = getInitials(userName);
 
   const onSignOut = async () => {
@@ -69,16 +70,27 @@ const ProfileMenu = ({
       return;
     }
     setPending(true);
+    setSignOutError(null);
     const startedAt = Date.now();
-    await authClient.signOut();
-    const elapsed = Date.now() - startedAt;
-    if (elapsed < MIN_LOAD_MS) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, MIN_LOAD_MS - elapsed),
-      );
+    try {
+      const result = await authClient.signOut();
+      if (result?.error) {
+        throw result.error;
+      }
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < MIN_LOAD_MS) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, MIN_LOAD_MS - elapsed),
+        );
+      }
+      setConfirmOpen(false);
+      router.push("/");
+      router.refresh();
+    } catch {
+      setSignOutError("Sign out failed. Please try again.");
+    } finally {
+      setPending(false);
     }
-    router.push("/login");
-    setPending(false);
   };
 
   return (
@@ -142,7 +154,10 @@ const ProfileMenu = ({
           <DropdownMenuGroup>
             <DropdownMenuItem
               variant="destructive"
-              onClick={() => setConfirmOpen(true)}>
+              onClick={() => {
+                setSignOutError(null);
+                setConfirmOpen(true);
+              }}>
               <LogOutIcon aria-hidden="true" />
               Sign out
             </DropdownMenuItem>
@@ -157,29 +172,46 @@ const ProfileMenu = ({
           }
         }}>
         <AlertDialogContent size="sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Are you sure you want to sign out?
-            </AlertDialogTitle>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={pending}
-              onClick={onSignOut}>
-              {pending ?
-                <>
-                  <Loader2Icon
-                    aria-hidden="true"
-                    className="animate-spin"
-                    data-icon="inline-start"
-                  />
-                  Signing out
-                </>
-              : "Sign out"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          {pending ?
+            <>
+              <AlertDialogTitle className="sr-only">
+                Are you sure you want to sign out?
+              </AlertDialogTitle>
+              <div
+                aria-live="polite"
+                className="grid min-h-24 place-items-center"
+                role="status">
+                <LoaderIcon
+                  aria-hidden="true"
+                  className="size-12 animate-spin"
+                />
+                <span className="sr-only">Signing out</span>
+              </div>
+            </>
+          : <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Are you sure you want to sign out?
+                </AlertDialogTitle>
+              </AlertDialogHeader>
+              {signOutError ?
+                <p
+                  role="alert"
+                  className="text-destructive text-sm">
+                  {signOutError}
+                </p>
+              : null}
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  disabled={pending}
+                  onClick={onSignOut}>
+                  Sign out
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          }
         </AlertDialogContent>
       </AlertDialog>
     </>

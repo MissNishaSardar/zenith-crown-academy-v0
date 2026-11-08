@@ -54,3 +54,6 @@ prisma/dev.db
 # uploads
 public/uploads/*
 !public/uploads/.gitkeep
+
+# local notes
+/School Management System.md

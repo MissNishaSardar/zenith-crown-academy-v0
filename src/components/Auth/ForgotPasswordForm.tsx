@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2Icon } from "lucide-react";
+import { LoaderIcon } from "lucide-react";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
@@ -97,7 +97,7 @@ const ForgotPasswordForm = () => {
         className="mt-5 h-[50px] w-full text-[15px] font-extrabold">
         {isSubmitting ?
           <>
-            <Loader2Icon
+            <LoaderIcon
               aria-hidden="true"
               className="animate-spin"
             />

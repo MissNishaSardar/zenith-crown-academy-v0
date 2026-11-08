@@ -1,7 +1,15 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+import { Separator } from "@/components/shadcnui/separator";
+import { SidebarTrigger } from "@/components/shadcnui/sidebar";
+import {
+  firstRoleName,
+  parseRoleNames,
+  roleLabels,
+  roleUrlSlug,
+} from "@/lib/auth/permissions";
 
 import ProfileMenu from "./ProfileMenu";
 import ThemeToggleButton from "./ThemeToggleButton";
@@ -19,26 +27,37 @@ const DashboardHeader = ({
   userImage,
   userName,
 }: DashboardHeaderProps) => {
+  const pathname = usePathname();
+  const roles = parseRoleNames(storedRole);
+  const activeRole =
+    roles.find(
+      (role) =>
+        pathname === `/dashboard/${roleUrlSlug(role)}` ||
+        pathname.startsWith(`/dashboard/${roleUrlSlug(role)}/`),
+    ) ?? firstRoleName(storedRole);
+  const roleLabel = roleLabels[activeRole];
+
   return (
-    <header className="border-border/70 bg-background/80 sticky top-0 z-50 h-16 shrink-0 border-b backdrop-blur-md">
-      <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6">
-        <Link
-          href="/dashboard"
-          aria-label="Zenith Crown Academy dashboard home"
-          className="flex min-w-0 items-center gap-2.5">
-          <Image
-            src="/logo-mark.png"
-            alt=""
-            width={954}
-            height={561}
-            priority
-            className="h-9 w-auto shrink-0"
+    <header className="border-border/70 bg-background/80 sticky top-0 z-50 h-14 shrink-0 border-b backdrop-blur-md">
+      <div className="flex h-full w-full items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2">
+          <SidebarTrigger />
+          <Separator
+            orientation="vertical"
+            className="h-4"
           />
-          <span className="font-heading text-foreground hidden truncate text-base leading-none font-bold tracking-tight min-[400px]:block sm:text-lg">
-            Zenith Crown{" "}
-            <span className="text-muted-foreground font-semibold">Academy</span>
-          </span>
-        </Link>
+          <nav
+            aria-label="Breadcrumb"
+            className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
+            <span className="text-muted-foreground">Dashboard</span>
+            <span
+              aria-hidden="true"
+              className="text-muted-foreground">
+              /
+            </span>
+            <span className="truncate font-semibold">{roleLabel}</span>
+          </nav>
+        </div>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <ThemeToggleButton />
           <ProfileMenu
