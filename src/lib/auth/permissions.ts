@@ -1,3 +1,5 @@
+import type { Prisma } from "@generated/prisma/client";
+
 import { createAccessControl } from "better-auth/plugins/access";
 
 // Mirrors the Admin plugin built in resource actions so admin operations stay
@@ -126,3 +128,15 @@ export const roleUrlSlug = (role: RoleName): string => roleUrlSlugs[role];
 
 export const resolveRolePath = (role: string | null | undefined): string =>
   `/dashboard/${roleUrlSlugs[firstRoleName(role)]}`;
+
+// Builds a where fragment matching a single role token inside the comma
+// separated role column. A plain substring match also matches vice_principal
+// when filtering for principal.
+export const roleTokenWhere = (role: RoleName): Prisma.UserWhereInput => ({
+  OR: [
+    { role },
+    { role: { startsWith: `${role},` } },
+    { role: { endsWith: `,${role}` } },
+    { role: { contains: `,${role},` } },
+  ],
+});
