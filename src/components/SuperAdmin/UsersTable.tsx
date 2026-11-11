@@ -362,6 +362,13 @@ const UsersTable = ({
         description: successDescription,
       });
       return true;
+    } catch {
+      toast.add({
+        type: "error",
+        title: "Action failed",
+        description: "Something went wrong. Please try again.",
+      });
+      return false;
     } finally {
       const elapsed = Date.now() - startedAt;
       if (elapsed < MIN_LOAD_MS) {

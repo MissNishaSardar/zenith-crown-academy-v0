@@ -157,13 +157,15 @@ const SuperAdminPage = async () => {
               value={bannedUsers}
             />
             <StatCard
-              hint="Arrives with the Sessions module"
+              href={"/dashboard/super-admin/sessions" as Route}
+              hint="Review in Sessions"
               icon={KeyRound}
               label="Active sessions"
               value={activeSessions}
             />
             <StatCard
-              hint="Arrives with the Sessions module"
+              href={"/dashboard/super-admin/sessions?status=expired" as Route}
+              hint="Review in Sessions"
               icon={Hourglass}
               label="Expired sessions"
               value={expiredSessions}
