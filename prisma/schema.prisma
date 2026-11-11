@@ -83,3 +83,20 @@ model Verification {
   @@index([identifier])
   @@map("verification")
 }
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  action       String
+  actorId      String
+  actorName    String
+  actorEmail   String
+  targetUserId String?
+  targetName   String?
+  targetEmail  String?
+  details      String
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@map("audit_log")
+}

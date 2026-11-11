@@ -177,3 +177,67 @@ Running record of tooling notes, UI element names, routes, and flow gotchas disc
 - Hub flash probe (review finding) measured as the seed principal by clicking the sidebar brand link into the redirect hub with a MutationObserver watching `main[aria-busy]`: the skeleton never appeared, `busySeen false` across two runs; the URL flips to `/dashboard` for about 130 to 250ms and then settles on `/dashboard/principal`. No route restructure needed.
 - Runtime rechecks with temp routes `dashboard/loading-check` (5s await) and `dashboard/throwaway-error-test` (throw page), both deleted in session: the streamed slow page showed the centered skeleton bar with the sidebar and header intact and then swapped to the real heading; retry stayed in the boundary on the throwaway while the shell stayed alive and the `Try again` reset worked with the `unknown` typing. Console audit contained only the throwaway errors and the known favicon.ico 404.
 - `bun run lint` green after deleting both probe scripts. Dev server Next 16.4.3 confirmed in this session.
+
+## Users and Roles module (2026-11-11, Super Admin phase 3)
+
+- Route: `/dashboard/super-admin/users-and-roles` (server page,
+  equireRole("super_admin"), reads searchParams and passes validated initialStatus/initialRole to the UsersTable client). Table data comes from the listAdminUsers server action in src/server/users.ts (Prisma directly, approved in this session, because the admin API supports only one ilterField per call so search + role + status cannot combine). Mutations (create, edit, roles, set password, ban, unban, delete, impersonate) all go through uthClient.admin.*.
+- Sign in for browser checks: `admin@gmail.com` / password equal to email. A leftover next dev from the user's session already holds port 3000 (PID 5828), a second `bun run dev` exits with "Another next dev server is already running", so browse the running server.
+- Create dialog: roles picker shows the 8 non super roles, defaults to student, the second slot only appears for parent or teacher and offers only the counterpart; generated 16 character password in a read only field with regenerate, plus Type your own mode. On success the reveal dialog shows the password once with copy. Verified: new user appears first in the list (18 then deleted back to 17 after cleanup).
+- Edit dialog: Save disabled until `formState.isDirty`. Identity edits allowed on any row, roles locked on super admin rows (identity still editable). Verified: name edit, role change student to parent plus teacher pair, both badges render, audit rows `user.update` and `user.role_set` written.
+- Ban dialog: Reason mandatory, Permanent/Temporary toggle, temporary defaults to 7 days with unit Select; success revokes sessions and the row shows `Until <date>` destructive badge. Banned sign in shows the reason and expiry at the login screen end to end (`bannedUserMessage` in `src/lib/auth.ts` plus the LoginForm 403 message passthrough). Verified on `verifyphase3`.
+- Row actions menu: every item disabled on the admin's own row (tooltip "This is your own account." visible on hover of the wrapper span, example verified); on a plain user all five items enabled. There is only one super admin row in the seed data, so the non self super admin mid case is code covered only.
+- Delete dialog: confirm button disabled until the exact email is typed; deletion removes the row (17 users before and after).
+- Empty and filter states: `?status=banned` and `?role=parent` deep links work (Overview link target); with no banned users the page shows "No users match those filters" with a Clear filters button. Search by name or email filters live with a 500 ms debounce.
+- Audit rows observed via `prisma.auditLog`: `user.create`, `user.ban`, `user.unban`, `user.update`, `user.role_set`, `user.password_set`. Test user `verifyphase3` was created, banned, unbanned, password set, re roles, deleted during this pass.
+- base-ui Select does not render the selected item's children; every `SelectValue` needs a label function or it shows the raw value ("all", "student", "days").
+- `bun run lint` green. Impersonate dialog renders and was cancelled in this pass because the Stop banner lands in phase 7. `bun lint:check` not run (heavy gate, on request only).
+
+## Users and Roles: TanStack data-table migration (2026-11-11)
+
+- `@tanstack/react-table@9.3.1` added with bun. v9 is feature-based: `tableFeatures({ rowPaginationFeature, rowSortingFeature })` in `UsersTable.tsx`, `createColumnHelper<DataTableFeatures, AdminUserRow>()`, `<table.FlexRender />`.
+- Server-side everything: `manualPagination: true`, `manualSorting: true`, `rowCount` from the paged total, clamped `pageIndex` guard for deletions on the last page, `resetPageIndex` on filter or sort change. `listAdminUsers` gained `sortBy` (`createdAt`|`name`, default `createdAt`) and `sortDir` (default `desc`).
+- The `@shadcn/data-table` registry item does not exist for this base-vega style; the composition comes from the official data-table guide (columns + data-table inside the feature file, not a registry block).
+- Gotcha: `row.getVisibleCells()` is provided by `columnVisibilityFeature`, which we deliberately do not register (no column hiding); use core `row.getAllCells()` instead.
+- Sortable headers: User (name) and Created (createdAtIso), toggle asc/desc with `column.toggleSorting(column.getIsSorted() === "asc")` and a three-state SortIcon. Verified: name asc and desc, createdAt toggle, both reset to page 1; pagination verified under sort; console 0 errors.
+
+## Username uniqueness: inline error plus suggestions (2026-11-11)
+
+- `src/server/users.ts` gained super_admin-guarded actions `isUsernameTaken` (exact match, optional `excludeUserId`) and `suggestUsernames` (`base<N>` then `base_<N>`, up to 3 available, single IN query; empty/normalized-empty bases return `[]`).
+- Both `UserCreateDialog` and `UserEditDialog` check on username blur and again at submit time; the blur result is stored as `{ value, taken, suggestions }` and only applied when it matches the current input, so a stale answer can never overwrite a newer one (first attempt with a `useRef` counter was rejected by the React Compiler lint rule `react-hooks/refs`; the value-keyed state survives it and is race free by construction).
+- Inline `FieldError` "That username is already taken." plus `aria-invalid`; up to 3 rounded-full outline chips under the field fill the value on click and clear the error. Edit dialog skips the check when the username is unchanged and passes `excludeUserId` (own username is never flagged, own value is always suggestion eligible).
+- Test user `Blur Target` (`librarian1`) was created through the full flow (chip pick, create), exercised the edit-dialog exclusion path, then deleted with the typed-email gate. Database back to 17 users. Console 0 errors, `bun run lint` green.
+
+## Users and Roles dialogs: field stacking plus reveal row (2026-11-12)
+
+- Name and Username Field blocks in `UserCreateDialog.tsx` and `UserEditDialog.tsx` were lifted out of the `grid sm:grid-cols-2` wrapper; both dialogs now stack them full width in the form's own `flex flex-col gap-4` flow.
+- `PasswordRevealDialog.tsx` now uses the same in-field trailing button pattern as `PasswordGenerateInput` manual mode: `relative` wrapper, `pr-12` on the read only Input, ghost `size=icon-sm` button absolute at `right-1.5 top-1/2 -translate-y-1/2`. The Done button sits in the same row as the field (field wrapper `flex-1 min-w-0`, Done `shrink-0`); `DialogFooter` is gone.
+- `screenshot --filename x.png` saves to the repo root, not `.playwright-cli`; move the file there afterwards. Bare `screenshot` errors out.
+- Element refs rotate wholesale between snapshots after a dialog closes or a menu opens (for example the row Actions button changes ref after Cancel); always re-snapshot before clicking instead of reusing refs.
+- Verified with the seed super admin `admin@gmail.com` (password equal to email): create flow end to end (created Clip Test / cliptest1, copy button flipped aria-label to Copied), edit dialog shows the stacked layout, test user deleted afterwards, database back to 19 users. Console: only React DevTools info and HMR lines, 0 errors.
+
+## Create dialog inline errors plus toast layer fix (2026-11-12, later same day)
+
+- Base UI toasts render as role=dialog inside a `region "Notifications"`; with the viewport stuck at `z-50` (same as the dialog portal, which mounts later) they painted behind the modal. `ToastViewport` in `shadcnui/toast.tsx` is now `z-[60]` and the root `Toaster` timeout went back to 2000 at the owner's call.
+- `UserCreateDialog.tsx` now carries a persistent destructive banner (`role="alert"`) at the top of the form for `admin.createUser` failures, cleared at the start of every submit. The submit-time username-taken toast was dropped because the inline FieldError already covers it. Audit-failure and success toasts stay as toasts and now render above modals.
+- Verified failure path: duplicate email `admin@gmail.com` returns 400, banner shows "User already exists. Use another email.", dialog stays open with fields intact; the only console error is the expected HTTP 400 resource log. Success path: toast "User created" renders above the reveal dialog (screenshot `success-toast-above.png`). Test user `Dupe Email Check` created then deleted, count back to 19.
+- Other SuperAdmin dialogs (edit, ban, confirm) still toast on error; they benefit from the z-[60] fix but have no inline banner.
+
+## Role filter substring bug (2026-11-12)
+
+- The `user.role` column stores comma separated slugs with no spaces (better-auth admin joins arrays via `roles.join(",")` in `dist/plugins/admin/routes.mjs`). Any `contains` on that column matches `principal` inside `vice_principal`, which leaked Vice Principal into the Principal filter on Users and Roles.
+- Fix: `roleTokenWhere(role)` in `src/lib/auth/permissions.ts` builds an OR of exact match, `startsWith(role + ",")`, `endsWith("," + role)`, `contains("," + role + ",")`. `listAdminUsers` in `src/server/users.ts` applies it as `where.AND = [roleTokenWhere(safeRole)]` so the top level search OR stays untouched. The Super Admin overview student/teacher/parent counts in `dashboard/super-admin/page.tsx` use the same helper now (no wrong counts existed there, same latent pattern).
+- Verified: Principal filter shows exactly Chhanda Sardar and Principal (1 to 2 of 2 users), Vice principal filter shows exactly 1, overview counts unchanged (Students 8, Teachers 1, Parents 1). `bun run lint` green.
+
+## Search by username (2026-11-12)
+
+- The Users and Roles search now matches name, email and username. Leading `@` characters are stripped in `listAdminUsers` (`searchTerm = trimmedSearch.replace(/^@+/, "")`), and an all-@ term falls back to no search filter. Placeholder is now "Search by name, email or username".
+- Verified: `viceprincipal01` returns exactly Chhanda Sardar, `@viceprincipal01` same single row, `principal@gmail.com` matches both `principal@gmail.com` and `viceprincipal@gmail.com` (substring semantics, same as before). `bun run lint` green.
+
+## Review fixes verification (2026-11-12, later same day)
+
+- Overview "What needs my attention": the three module cards (Active sessions, Expired sessions, Audit actions in 24h) render static, no link role, no ArrowRight, hints "Arrives with the Sessions/System Health module"; Banned users card keeps the link and arrow. StatCard now has `href?` and renders a plain div without it.
+- Username rules now mirror the username plugin (min 3, max 30, charset letters/numbers/dot/underscore) in a shared `usernameSchema` in zodSchema.ts. Verified on the running dev server: typing `ab` and blurring shows `role=alert` "Username must be at least 3 characters", `my-user` shows "Use only letters, numbers, dots and underscores", `ADMIN` resolves against stored `admin` (isUsernameTaken now lowercases) and shows "That username is already taken." with Try chips.
+- Delete confirm dialog remounts per target (`key={deleteFor?.id ?? "closed"}` in UsersTable), so the typed email no longer survives a Cancel-and-reopen. Verified: typed `sentinel@example.com`, Cancel, reopen, input empty.
+- Console audit after the fixes: React DevTools info and HMR Fast Refresh lines only, 0 errors. `bun run lint` green.
+- Gotcha: the sidebar still links to unbuilt `/dashboard/super-admin/sessions`, `/system-health`, `/backups`, `/system-settings` (phases 4 to 7). Pre-existing, plan approved, expected 404 until those phases land.

@@ -43,8 +43,8 @@ const LoginForm = () => {
     if (error) {
       setError("root", {
         message:
-          error.status === 403 ?
-            "This account is blocked. Contact school admin."
+          error.status === 403 && error.message ?
+            error.message
           : "Invalid email or username or password. Try again.",
       });
       return;

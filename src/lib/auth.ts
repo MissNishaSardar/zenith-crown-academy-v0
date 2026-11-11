@@ -30,6 +30,32 @@ export const auth = betterAuth({
       ac,
       roles,
       defaultRole,
+      bannedUserMessage: (user) => {
+        const record = user as {
+          banExpires?: unknown;
+          banReason?: unknown;
+        };
+        const reason =
+          typeof record.banReason === "string" && record.banReason.trim() ?
+            record.banReason.trim()
+          : null;
+        const rawExpiry = record.banExpires;
+        const expiresAt =
+          rawExpiry instanceof Date ? rawExpiry
+          : typeof rawExpiry === "string" ? new Date(rawExpiry)
+          : null;
+        const validExpiry =
+          expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null;
+        const expiryNote =
+          validExpiry ?
+            ` until ${new Intl.DateTimeFormat("en-IN", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }).format(validExpiry)}`
+          : " permanently";
+        const reasonNote = reason ? ` Reason: ${reason}.` : "";
+        return `This account is banned${expiryNote}.${reasonNote} Contact the school office if you believe this is a mistake.`;
+      },
     }),
     username({ displayUsername: false }),
     nextCookies(),
