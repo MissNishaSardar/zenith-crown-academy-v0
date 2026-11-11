@@ -3,9 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 // The live session cookie is better-auth.session_token. On HTTPS it carries
 // the __Secure- prefix, so match the token name as a substring instead of
 // requiring the better-auth prefix at the start. Matching session_data here
-// would treat a stale cache cookie as a live session and loop with
-// /login. Require session_token so anonymous requests still bounce to
-// /login and the server guards stay authoritative.
+// would treat a stale cache cookie as a live session. Require session_token
+// so anonymous requests still bounce to /login and the server guards stay
+// authoritative. The auth pages (/login, /forgot-password) validate the
+// session themselves instead of trusting this cookie hint.
 const hasSessionCookie = (request: NextRequest): boolean =>
   request.cookies
     .getAll()
@@ -16,24 +17,18 @@ const hasSessionCookie = (request: NextRequest): boolean =>
 
 export const proxy = (request: NextRequest) => {
   const { pathname } = request.nextUrl;
-  const isAuthedCookie = hasSessionCookie(request);
 
-  // Cheap hint layer only. Real authorization happens in the server guards.
-  if (!isAuthedCookie && pathname.startsWith("/dashboard")) {
+  // Cheap hint layer only. Real authorization happens in the server guards,
+  // and the auth pages decide for themselves whether to show a form or
+  // redirect. A stale cookie therefore cannot bounce visitors away from the
+  // login page or loop with /dashboard.
+  if (!hasSessionCookie(request) && pathname.startsWith("/dashboard")) {
     return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  // /reset-password intentionally stays reachable with a session cookie so
-  // reset links work even with a stale cookie or while signed in.
-  const isAuthPage = pathname === "/login" || pathname === "/forgot-password";
-
-  if (isAuthedCookie && isAuthPage) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return NextResponse.next();
 };
 
 export const config = {
-  matcher: ["/login", "/forgot-password", "/dashboard", "/dashboard/:path*"],
+  matcher: ["/dashboard", "/dashboard/:path*"],
 };
