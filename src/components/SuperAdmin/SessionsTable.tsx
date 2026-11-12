@@ -9,7 +9,9 @@ import {
   LogOutIcon,
   MonitorSmartphoneIcon,
   MoreHorizontalIcon,
+  RefreshCwIcon,
   SearchIcon,
+  TriangleAlertIcon,
   UserXIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -47,6 +49,7 @@ import { toast } from "@/components/shadcnui/toast";
 import { authClient } from "@/lib/auth-client";
 import { MIN_LOAD_MS } from "@/lib/auth/withMinimumLoad";
 import { parseRoleNames, roleLabels } from "@/lib/auth/permissions";
+import { dateFmt } from "@/lib/time";
 import { logAudit } from "@/server/audit";
 import {
   listAdminSessions,
@@ -55,45 +58,9 @@ import {
   type AdminSessionsPage,
 } from "@/server/sessions";
 import ConfirmDialog from "@/components/SuperAdmin/ConfirmDialog";
+import RelativeTime from "@/components/SuperAdmin/RelativeTime";
 
 const PAGE_SIZE = 10;
-
-const dateFmt = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" });
-const dateTimeFmt = new Intl.DateTimeFormat("en-IN", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-const relativeTimeFmt = new Intl.RelativeTimeFormat("en-IN", {
-  numeric: "auto",
-});
-
-const relativeTime = (iso: string, nowMs: number): string => {
-  const diffMs = new Date(iso).getTime() - nowMs;
-  const sign = diffMs < 0 ? -1 : 1;
-  const abs = Math.abs(diffMs);
-  if (abs < 60_000) {
-    return diffMs < 0 ? "under a minute ago" : "in under a minute";
-  }
-  if (abs < 3_600_000) {
-    return relativeTimeFmt.format(sign * Math.floor(abs / 60_000), "minute");
-  }
-  if (abs < 86_400_000) {
-    return relativeTimeFmt.format(sign * Math.floor(abs / 3_600_000), "hour");
-  }
-  if (abs < 30 * 86_400_000) {
-    return relativeTimeFmt.format(sign * Math.floor(abs / 86_400_000), "day");
-  }
-  if (abs < 365 * 86_400_000) {
-    return relativeTimeFmt.format(
-      sign * Math.floor(abs / (30 * 86_400_000)),
-      "month",
-    );
-  }
-  return relativeTimeFmt.format(
-    sign * Math.floor(abs / (365 * 86_400_000)),
-    "year",
-  );
-};
 
 const deviceLabel = (userAgent: string | null): string => {
   if (!userAgent) {
@@ -185,6 +152,7 @@ const SessionsTable = ({
   const [pageIndex, setPageIndex] = useState(0);
   const [data, setData] = useState<AdminSessionsPage | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(
     null,
@@ -218,11 +186,13 @@ const SessionsTable = ({
       .then((result) => {
         if (!cancelled) {
           setData(result);
+          setLoadFailed(false);
           setLoading(false);
         }
       })
       .catch(() => {
         if (!cancelled) {
+          setLoadFailed(true);
           setLoading(false);
           toast.add({
             type: "error",
@@ -243,6 +213,7 @@ const SessionsTable = ({
   const showingFrom = total === 0 ? 0 : clampedPageIndex * PAGE_SIZE + 1;
   const showingTo = Math.min(total, (clampedPageIndex + 1) * PAGE_SIZE);
   const filtersActive = debouncedSearch.length > 0 || status !== "all";
+  const statusOnlyEmpty = debouncedSearch.length === 0 && status !== "all";
 
   const refreshList = () => {
     setLoading(true);
@@ -336,7 +307,7 @@ const SessionsTable = ({
     }
   };
 
-  const showSkeleton = data === null;
+  const showSkeleton = data === null && !loadFailed;
 
   return (
     <TooltipProvider delay={150}>
@@ -437,13 +408,73 @@ const SessionsTable = ({
                     </TableCell>
                   </TableRow>
                 ))
+              : loadFailed ?
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="h-56">
+                    <div className="flex flex-col items-center justify-center gap-3 text-center">
+                      <TriangleAlertIcon
+                        aria-hidden="true"
+                        className="text-muted-foreground size-8"
+                      />
+                      <p className="font-heading text-base font-semibold">
+                        Could not load sessions
+                      </p>
+                      <p className="text-muted-foreground max-w-sm text-sm leading-relaxed">
+                        The session list could not be loaded. Retry, or refresh
+                        the page.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={loading}
+                        onClick={() => refreshList()}>
+                        <RefreshCwIcon
+                          aria-hidden="true"
+                          className={loading ? "animate-spin" : undefined}
+                        />
+                        Retry
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
               : sessions.length === 0 ?
                 <TableRow>
                   <TableCell
                     colSpan={8}
                     className="h-56">
                     <div className="flex flex-col items-center justify-center gap-3 text-center">
-                      {filtersActive ?
+                      {statusOnlyEmpty ?
+                        <>
+                          <KeyRoundIcon
+                            aria-hidden="true"
+                            className="text-muted-foreground size-8"
+                          />
+                          <p className="font-heading text-base font-semibold">
+                            No {status === "active" ? "active" : "expired"}{" "}
+                            sessions
+                          </p>
+                          <p className="text-muted-foreground max-w-sm text-sm leading-relaxed">
+                            {status === "active" ?
+                              "Sessions appear here while people are signed in. Switch to All to also see expired sessions."
+                            : "No sessions have expired. Switch to All to see active sessions too."
+                            }
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setStatus("all");
+                              setLoading(true);
+                              resetPage();
+                            }}>
+                            Switch to All
+                          </Button>
+                        </>
+                      : filtersActive ?
                         <>
                           <UserXIcon
                             aria-hidden="true"
@@ -530,26 +561,31 @@ const SessionsTable = ({
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm tabular-nums">
                         {row.ipAddress ?
-                          <span
-                            title={row.ipAddress}
-                            className="block max-w-40 truncate">
-                            {row.ipAddress}
-                          </span>
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <span className="block max-w-40 cursor-help truncate">
+                                  {row.ipAddress}
+                                </span>
+                              }
+                            />
+                            <TooltipContent side="top">
+                              {row.ipAddress}
+                            </TooltipContent>
+                          </Tooltip>
                         : "Unknown"}
                       </TableCell>
                       <TableCell>
-                        <span
-                          title={dateTimeFmt.format(new Date(row.createdAtIso))}
-                          className="text-muted-foreground text-sm tabular-nums">
+                        <span className="text-muted-foreground text-sm tabular-nums">
                           {dateFmt.format(new Date(row.createdAtIso))}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span
-                          title={dateTimeFmt.format(new Date(row.expiresAtIso))}
-                          className="text-muted-foreground text-sm tabular-nums">
-                          {relativeTime(row.expiresAtIso, nowMs)}
-                        </span>
+                        <RelativeTime
+                          iso={row.expiresAtIso}
+                          nowMs={nowMs}
+                          className="text-sm"
+                        />
                       </TableCell>
                       <TableCell>
                         {hasFlags ?
@@ -618,7 +654,9 @@ const SessionsTable = ({
         {/* Pagination */}
         <div className="flex flex-col gap-2 border-t px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <span className="text-muted-foreground flex items-center gap-2">
-            {data ?
+            {loadFailed ?
+              "Could not load sessions"
+            : data ?
               `Showing ${showingFrom} to ${showingTo} of ${total} ${
                 total === 1 ? "session" : "sessions"
               }`

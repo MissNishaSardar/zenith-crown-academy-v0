@@ -16,8 +16,10 @@ import {
   MoreHorizontalIcon,
   PencilLineIcon,
   PlusIcon,
+  RefreshCwIcon,
   SearchIcon,
   Trash2Icon,
+  TriangleAlertIcon,
   Undo2Icon,
   UserXIcon,
   UsersIcon,
@@ -108,10 +110,6 @@ import UserEditDialog from "@/components/SuperAdmin/UserEditDialog";
 const PAGE_SIZE = 10;
 
 const dateFmt = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" });
-const dateTimeFmt = new Intl.DateTimeFormat("en-IN", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
 
 const features = tableFeatures({
   rowPaginationFeature,
@@ -227,6 +225,7 @@ const UsersTable = ({
   ]);
   const [data, setData] = useState<AdminUsersPage | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -279,11 +278,13 @@ const UsersTable = ({
       .then((result) => {
         if (!cancelled) {
           setData(result);
+          setLoadFailed(false);
           setLoading(false);
         }
       })
       .catch(() => {
         if (!cancelled) {
+          setLoadFailed(true);
           setLoading(false);
           toast.add({
             type: "error",
@@ -592,12 +593,23 @@ const UsersTable = ({
           enableSorting: false,
           cell: ({ row }) => {
             const statusInfo = statusOf(row.original);
+            const badge = (
+              <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+            );
+            if (!statusInfo.title) {
+              return badge;
+            }
             return (
-              <Badge
-                variant={statusInfo.variant}
-                title={statusInfo.title}>
-                {statusInfo.label}
-              </Badge>
+              <Tooltip>
+                <TooltipTrigger
+                  render={<span className="cursor-help">{badge}</span>}
+                />
+                <TooltipContent
+                  side="top"
+                  className="max-w-xs break-words">
+                  {statusInfo.title}
+                </TooltipContent>
+              </Tooltip>
             );
           },
         }),
@@ -616,9 +628,7 @@ const UsersTable = ({
             </Button>
           ),
           cell: ({ row }) => (
-            <span
-              title={dateTimeFmt.format(new Date(row.original.createdAtIso))}
-              className="text-muted-foreground text-sm tabular-nums">
+            <span className="text-muted-foreground text-sm tabular-nums">
               {dateFmt.format(new Date(row.original.createdAtIso))}
             </span>
           ),
@@ -738,7 +748,7 @@ const UsersTable = ({
     },
   });
 
-  const showSkeleton = data === null;
+  const showSkeleton = data === null && !loadFailed;
 
   return (
     <TooltipProvider delay={150}>
@@ -874,6 +884,38 @@ const UsersTable = ({
                     </TableCell>
                   </TableRow>
                 ))
+              : loadFailed ?
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-56">
+                    <div className="flex flex-col items-center justify-center gap-3 text-center">
+                      <TriangleAlertIcon
+                        aria-hidden="true"
+                        className="text-muted-foreground size-8"
+                      />
+                      <p className="font-heading text-base font-semibold">
+                        Could not load users
+                      </p>
+                      <p className="text-muted-foreground max-w-sm text-sm leading-relaxed">
+                        The user list could not be loaded. Retry, or refresh the
+                        page.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={loading}
+                        onClick={() => refreshList()}>
+                        <RefreshCwIcon
+                          aria-hidden="true"
+                          className={loading ? "animate-spin" : undefined}
+                        />
+                        Retry
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
               : table.getRowModel().rows.length === 0 ?
                 <TableRow>
                   <TableCell
@@ -947,7 +989,9 @@ const UsersTable = ({
         {/* Pagination */}
         <div className="flex flex-col gap-2 border-t px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <span className="text-muted-foreground flex items-center gap-2">
-            {data ?
+            {loadFailed ?
+              "Could not load users"
+            : data ?
               `Showing ${showingFrom} to ${showingTo} of ${total} ${
                 total === 1 ? "user" : "users"
               }`

@@ -60,6 +60,24 @@ export const auth = betterAuth({
     username({ displayUsername: false }),
     nextCookies(),
   ],
+  // Purge expired sessions on every new sign-in so the session table does
+  // not accumulate dead rows. Best effort: a purge failure must never
+  // block sign-in.
+  databaseHooks: {
+    session: {
+      create: {
+        after: async () => {
+          try {
+            await prisma.session.deleteMany({
+              where: { expiresAt: { lte: new Date() } },
+            });
+          } catch (error) {
+            console.warn("Could not purge expired sessions.", error);
+          }
+        },
+      },
+    },
+  },
   secret: serverEnv.BETTER_AUTH_SECRET,
 });
 

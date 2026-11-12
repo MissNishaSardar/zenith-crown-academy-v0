@@ -60,6 +60,9 @@ Engines: Node >= 24, bun >= 1.4. Package manager: bun.
 ## Verification
 
 - **Primary**: `bun run lint`, eslint only. This is the default check.
+- **Non obvious lint rule**: React compiler purity (`react-hooks/purity`) rejects `performance.now()` AND `Date.now()` during render; use `new Date().getTime()` for elapsed-time measurement in server components.
+- **System Health disk check**: `fs.statfs` works on Windows under Node 24 and is what the Disk check uses.
+- **shadcn Select popup**: `SelectContent` from `@/components/shadcnui/select` pins itself to the trigger width via `w-(--anchor-width)` on the popup, which clips wider items. Pass `className="w-max"` plus `alignItemWithTrigger={false}` when item content exceeds the trigger width.
 - **Heavy gates**: `bun lint:check` runs `next typegen`, `tsc --noEmit`, and `eslint`. `bun run build` runs `prisma generate && next build`. Use these only when requested or when playwright-cli testing fails, since the dev server already runs typegen and typechecks during browser verification.
 - **Browser**: Use `@playwright/cli` via `bunx @playwright/cli` (the old `playwright-cli` package is deprecated and errors with "could not determine executable"). The CLI blocks `file:` URLs, so test over http: run `bun run dev` and browse `http://localhost:3000`, or serve a static preview with e.g. `bunx serve -l 4599 .` from the repo root and browse `http://localhost:4599/<path>`. Enumerate capabilities with `bunx @playwright/cli --help`.
 - **Headed mode**: Always run visible with `--headed`, e.g. `bunx @playwright/cli open --headed ...`.

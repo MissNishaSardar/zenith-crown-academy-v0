@@ -171,9 +171,10 @@ const SuperAdminPage = async () => {
               value={expiredSessions}
             />
             <StatCard
-              hint="Arrives with the System Health module"
+              href={"/dashboard/super-admin/system-health" as Route}
+              hint="Review in System Health"
               icon={ScrollText}
-              label="Audit actions in 24h"
+              label="Admin actions in 24h"
               value={auditActionsLast24h}
             />
           </div>

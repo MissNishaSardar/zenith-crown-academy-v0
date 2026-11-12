@@ -9,7 +9,9 @@ export const metadata: Metadata = {
 };
 
 const toStatusFilter = (value: unknown): AdminSessionStatus =>
-  value === "active" || value === "expired" ? value : "all";
+  value === "all" || value === "expired" || value === "active" ?
+    value
+  : "active";
 
 const SessionsPage = async ({
   searchParams,
