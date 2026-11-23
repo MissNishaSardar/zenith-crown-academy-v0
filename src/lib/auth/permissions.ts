@@ -160,6 +160,19 @@ export const roleLabels: Record<RoleName, string> = {
   librarian: "Librarian",
 };
 
+export const roleDescriptions: Record<RoleName, string> = {
+  owner: "Read-only view across the school",
+  administrator: "Users, roles, and school configuration",
+  principal: "Curriculum, exams, and academic leadership",
+  vice_principal: "Attendance, discipline, and timetable",
+  teacher: "Teaching and classwork",
+  student: "Learning and assignments",
+  parent: "Child progress and updates",
+  accountant: "Fees and payments",
+  office_staff: "Records and front-office tasks",
+  librarian: "Catalog and lending",
+};
+
 const roleUrlSlugs: Record<RoleName, string> = {
   owner: "owner",
   administrator: "administrator",
@@ -184,7 +197,17 @@ const normalizeRolePart = (part: string): RoleName | null => {
     return part as RoleName;
   }
   const aliased = legacyRoleAliases[part];
-  return aliased ?? null;
+  if (aliased) {
+    return aliased;
+  }
+  const slugged = (Object.keys(roleUrlSlugs) as RoleName[]).find(
+    (role) => roleUrlSlugs[role] === part,
+  );
+  if (slugged) {
+    return slugged;
+  }
+  console.warn(`Unknown role value ignored: "${part}"`);
+  return null;
 };
 
 // The role field stores comma separated values when a user holds several roles.

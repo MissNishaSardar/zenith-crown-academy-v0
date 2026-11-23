@@ -54,3 +54,6 @@ prisma/dev.db
 # uploads
 public/uploads/*
 !public/uploads/.gitkeep
+
+# local planning notes (kept out of the repo)
+tech.md

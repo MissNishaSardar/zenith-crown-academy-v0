@@ -99,7 +99,7 @@ Running record of tooling notes, UI element names, routes, and flow gotchas disc
 
 ## Route separation and RBAC pass (implemented 2026-11-02, trimmed to bare stubs 2026-11-04)
 
-- Route groups: `src/app/(public)/` with landing at `/` and site Header in `layout.tsx`, `src/app/(auth)/` as bare pass-through layout with no site header and only `/login`, `src/app/(dashboard)/` with session guarded `layout.tsx` wrapping children in a bare `flex min-h-svh flex-col` container, plus `dashboard/` with role redirector and 10 role home stubs. The inner `(dashboard)/dashboard/layout.tsx` sidebar shell was deleted; the top group layout is the only session guard layer.
+- Route groups: `src/app/(public)/` with landing at `/` and site Header in `layout.tsx`, `src/app/(auth)/` as bare pass-through layout with no site header and only `/login`, `src/app/(dashboard)/` with session guarded `layout.tsx` rendering the shared `DashboardShell` with sidebar, header, and capped content, plus `dashboard/` with role redirector and 10 role home stubs.
 - Roles under the better-auth admin plugin access control: `owner` as read only business owner, `administrator` as technical system admin replacing legacy `super_admin`, `principal` as academic head, `vice_principal` as deputy for attendance, discipline, and timetable only with no board exam finalization or promotions, plus `teacher`, `student` as signup default via `defaultRole`, `parent`, `accountant`, `office_staff`, `librarian`. Definitions and URL slug map live in `src/lib/auth/permissions.ts`; guards live in `src/server/guards.ts` with `requireSession` and `requireRole` wrapped in React `cache`. Database blocks direct URL access per role; middleware layer is `src/proxy.ts`. Legacy `super_admin` values map to `administrator` and `/dashboard/super-admin` redirects to `/dashboard/administrator`.
 - Gotcha: Next 16 renamed middleware to proxy. The file is `src/proxy.ts` exporting `proxy` (not `middleware`), matcher constants only, Node.js runtime by default. It only does cookie presence checks; real authorization stays in the guards.
 - Gotcha: `nextCookies()` must be the LAST plugin in the better-auth `plugins` array, otherwise a server warning appears and cookies can be dropped.
@@ -130,7 +130,32 @@ Running record of tooling notes, UI element names, routes, and flow gotchas disc
 - Auth screenshots from this pass: `.playwright-cli/auth-login.png`, `auth-dashboard-student.png`, `auth-forgot.png`, `auth-reset-token.png`, `auth-reset-notoken.png`. Console: 0 errors. Pre-existing warnings only: React DevTools info, HMR log, one Image aspect warning from `AuthCard` logo, one verbose password autocomplete hint on reset.
 - Seed is dev-only: `prisma/seed.ts` refuses to run when NODE_ENV=production, and re-running it no longer resets `banned`.
 
+## Shared dashboard shell (implemented 2026-11-24)
+
+- Structure: `(dashboard)/layout.tsx` renders client `DashboardShell`, which owns collapsed and mobile drawer state and composes `DashboardSidebar`, `DashboardHeader`, and a shared `main` capped at `max-w-7xl` with `px-4 sm:px-6`. Sidebar state persists in `localStorage` under `zca-sidebar-collapsed` via `useSyncExternalStore` with a server snapshot of collapsed, so no hydration mismatch and no `set-state-in-effect` lint error. Drawer open tracks the pathname where it opened, so any navigation auto closes it, plus overlay click and Escape.
+- Sidebar: desktop icon rail `w-16` collapsed by default with tooltips plus aria labels, `w-60` expanded with labels, sticky `h-svh`, hidden below `md`. Brand lives in the sidebar top as a two line wordmark when expanded and mark only when collapsed. Mobile drawer is a fixed overlay with brand and full labels.
+- Header: single row with mobile menu button, desktop collapse toggle with `aria-expanded`, per-page `Breadcrumbs`, theme toggle, and profile menu. Role switching stays only inside the profile menu. No brand in the header.
+- Links: `src/lib/dashboard-nav.ts` maps the active role to Dashboard plus its own workspace home, both existing pages only, so no dead routes. Active role derives from the pathname with fallback to the first stored role. Breadcrumbs are per page as Dashboard link plus current workspace plain text, set through `BreadcrumbTrail` context.
+- Gotchas: `react-hooks/set-state-in-effect` errors on sync `setState` in effects and `react-hooks/refs` errors on ref reads during render. Fixes used: `useSyncExternalStore` for the persisted toggle and pathname-tracked drawer state instead of effects. The expanded sidebar truncates a single line wordmark at `w-60`, so the brand stacks as `Zenith Crown` plus `Academy`.
+- Verified: `bun run lint` passed. API matrix of admin own 200, owner own 200, foreign bounces 307 to own home, legacy super-admin 307 to administrator, anon 307 to login. Headed browser at desktop and 390 widths: collapsed rail, expanded labels, drawer open plus link tap auto close, breadcrumbs, even gutters, console 0 errors 0 warnings.
+
+## Dashboard shell fixes, toggle, brand, headers, surfaces
+
+- Toggle sits flush against the sidebar edge with no left padding and square left corners, mobile hamburger goes flush the same way. The `max-w-7xl` cap was then removed entirely per the wide reference: header row and main are full width with even side gutters, toggle back in normal flow. Sidebar collapsed mark wraps in a fixed `size-10` box with `object-contain` since the rail content box is only 40px after padding while the mark at `h-9` runs about 61px wide.
+- Page headers use a shared `PageHeader` with top-left title plus subtitle from the central `roleDescriptions` map beside `roleLabels`. All ten stubs render breadcrumb trail plus header with empty content below, no centered hero text.
+- Sidebar, drawer, and header share the `bg-sidebar` surface with solid `border-sidebar-border` dividers so the shell reads as one frame around the content.
+- Verified: `bun run lint` passed. Headed browser at desktop and 390 widths, dark and light themes: flush toggle, contained collapsed mark, expanded brand intact, top-left headers with subtitles, distinct shell surface with solid dividers, console 0 errors 0 warnings. Wide 1920 check after cap removal: header and content run edge to edge with the toggle glued to the rail.
+
 ## Login mocks deleted and header Sign in check (2026-11-06)
 
 - Deleted `mockups/login/` (all six HTML files). `mockups/` held only that folder, so the now empty parent was removed too; `git status` no longer lists `mockups/`.
 - Header `Sign in` link (`href="/login"`) sits next to `ThemeToggleButton` at both widths with no overlap. At 390 the home link and Sign in bounding boxes abut exactly (0px gap), the middle whitespace is only the inner padding, so any future header growth will collide first on mobile.
+
+## Sidebar content gap (2026-11-24)
+
+- First try was `gap-4` on the `DashboardShell` outer row. It gave a 16px background strip but broke the frame: sidebar `border-r` and header `border-b` no longer met, leaving a notch at the corner.
+- Final choice is the connected frame: outer row has no gap, sidebar border meets the content edge. Space lives inside the content: `main` uses `py-6 pr-6 pl-[52px] sm:pr-8 sm:pl-[52px]`, and the header breadcrumb wrapper keeps `pl-2` while the collapse toggle stays flush to the sidebar.
+- The 52px left value equals toggle 36px plus header `gap-2` 8px plus crumb `pl-2` 8px, so crumb text and page title share the same left edge. Probe reads delta 0px at 929px and at 390px widths. Right gutters stay `pr-6 sm:pr-8`.
+- Probe after the fix: frame gap 0px, main left padding 52px. Console 0 errors.
+- Gotcha: editing the shell class while the dev server holds a stale render shows a hydration mismatch with server HTML missing the new class and the spacing measures 0px. Restarting `next dev` clears it back to 0 console errors.
+- Review fixes: `resolveActiveRole` matches the URL segment after `/dashboard/` so nested routes and trailing slashes keep the right sidebar; `normalizeRolePart` also accepts hyphenated slugs and warns on truly unknown values instead of silently falling back to student; `BreadcrumbTrail` deps use the serialized items so inline array literals cannot refire the effect; crumb list keys are index qualified; `BreadcrumbItem.href` is typed as `Route`.

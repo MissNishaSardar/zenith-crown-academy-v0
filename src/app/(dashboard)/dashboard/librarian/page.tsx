@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 
+import { BreadcrumbTrail } from "@/components/Layout/Breadcrumbs";
+import PageHeader from "@/components/Layout/PageHeader";
+import { roleDescriptions, roleLabels } from "@/lib/auth/permissions";
 import { requireRole } from "@/server/guards";
 
 export const metadata: Metadata = {
@@ -10,14 +13,18 @@ const LibrarianPage = async () => {
   await requireRole("librarian");
 
   return (
-    <main className={"flex flex-1 items-center justify-center px-6 py-16"}>
-      <h1
-        className={
-          "font-heading text-foreground text-3xl font-bold tracking-tight"
-        }>
-        Librarian workspace
-      </h1>
-    </main>
+    <div className="flex flex-1 flex-col gap-6">
+      <BreadcrumbTrail
+        items={[
+          { href: "/dashboard", label: "Dashboard" },
+          { label: "Librarian workspace" },
+        ]}
+      />
+      <PageHeader
+        subtitle={roleDescriptions.librarian}
+        title={`${roleLabels.librarian} workspace`}
+      />
+    </div>
   );
 };
 

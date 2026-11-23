@@ -1,56 +1,74 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
+import { Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import ProfileMenu from "./ProfileMenu";
 import ThemeToggleButton from "./ThemeToggleButton";
+import { Breadcrumbs } from "./Breadcrumbs";
 
 type DashboardHeaderProps = {
+  collapsed: boolean;
   storedRole: string | null | undefined;
   userEmail: string;
   userImage: string | null | undefined;
   userName: string;
+  onOpenMobile: () => void;
+  onToggle: () => void;
 };
 
 const DashboardHeader = ({
+  collapsed,
   storedRole,
   userEmail,
   userImage,
   userName,
-}: DashboardHeaderProps) => {
-  return (
-    <header className="border-border/70 bg-background/80 sticky top-0 z-50 h-16 shrink-0 border-b backdrop-blur-md">
-      <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6">
-        <Link
-          href="/dashboard"
-          aria-label="Zenith Crown Academy dashboard home"
-          className="flex min-w-0 items-center gap-2.5">
-          <Image
-            src="/logo-mark.png"
-            alt=""
-            width={954}
-            height={561}
-            priority
-            className="h-9 w-auto shrink-0"
+  onOpenMobile,
+  onToggle,
+}: DashboardHeaderProps) => (
+  <header className="bg-sidebar/80 border-sidebar-border sticky top-0 z-40 h-16 shrink-0 border-b backdrop-blur-md">
+    <div className="flex h-full w-full items-center gap-2 pr-4 sm:pr-6">
+      <button
+        type="button"
+        aria-label="Open menu"
+        onClick={onOpenMobile}
+        className="text-muted-foreground hover:bg-accent hover:text-accent-foreground flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-r-md transition-colors md:hidden">
+        <Menu
+          aria-hidden="true"
+          className="size-5"
+        />
+      </button>
+      <button
+        type="button"
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        aria-expanded={!collapsed}
+        onClick={onToggle}
+        className="text-muted-foreground hover:bg-accent hover:text-accent-foreground hidden size-9 shrink-0 cursor-pointer items-center justify-center rounded-r-md transition-colors md:flex">
+        {collapsed ?
+          <PanelLeftOpen
+            aria-hidden="true"
+            className="size-5"
           />
-          <span className="font-heading text-foreground hidden truncate text-base leading-none font-bold tracking-tight min-[400px]:block sm:text-lg">
-            Zenith Crown{" "}
-            <span className="text-muted-foreground font-semibold">Academy</span>
-          </span>
-        </Link>
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          <ThemeToggleButton />
-          <ProfileMenu
-            storedRole={storedRole}
-            userEmail={userEmail}
-            userImage={userImage}
-            userName={userName}
+        : <PanelLeftClose
+            aria-hidden="true"
+            className="size-5"
           />
-        </div>
+        }
+      </button>
+      {/* pl-2 plus toggle 36 and row gap 8 sets the 52px crumb offset that main padding mirrors. */}
+      <div className="flex min-w-0 flex-1 items-center pl-2">
+        <Breadcrumbs />
       </div>
-    </header>
-  );
-};
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+        <ThemeToggleButton />
+        <ProfileMenu
+          storedRole={storedRole}
+          userEmail={userEmail}
+          userImage={userImage}
+          userName={userName}
+        />
+      </div>
+    </div>
+  </header>
+);
 
 export default DashboardHeader;
