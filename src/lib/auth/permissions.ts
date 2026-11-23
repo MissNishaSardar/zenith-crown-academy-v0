@@ -1,7 +1,8 @@
 import { createAccessControl } from "better-auth/plugins/access";
 
 // Mirrors the Admin plugin built in resource actions so admin operations stay
-// assignable to custom roles. Extend academy resources here as modules grow.
+// assignable to custom roles. Academy resources carry the delegation
+// boundaries for owner, administrator, principal, and vice principal.
 const statement = {
   user: [
     "create",
@@ -17,6 +18,20 @@ const statement = {
     "update",
   ],
   session: ["list", "revoke", "delete"],
+  academic: [
+    "view",
+    "view-reports",
+    "manage-curriculum",
+    "manage-exams",
+    "manage-promotions",
+    "finalize-exams",
+    "manage-assignments",
+    "manage-attendance",
+    "manage-discipline",
+    "manage-timetable",
+  ],
+  fees: ["view", "manage"],
+  system: ["view", "manage"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -24,26 +39,75 @@ export const ac = createAccessControl(statement);
 const allUserActions = [...statement.user];
 const allSessionActions = [...statement.session];
 
-export const superAdmin = ac.newRole({
+// Technical system administrator. Full user and session control plus school
+// config, integrations, backups, audit logs, sessions, classes, and fee
+// heads. Academic areas stay view only. No routine academic decisions.
+export const administrator = ac.newRole({
   user: allUserActions,
   session: allSessionActions,
+  academic: ["view", "view-reports"],
+  fees: ["view", "manage"],
+  system: ["view", "manage"],
 });
 
-// Only super_admin holds privileged actions. The Admin plugin checks action
-// membership only, with no role hierarchy. Granting set-role or set-password
-// to principal or vice_principal would let them promote any account to
-// super_admin or take over a super_admin account. update is safe without
-// set-role, ban, or set-email because the plugin re-checks those actions
-// when the payload touches role, banned, or email fields.
+// School owner. Non technical business role with read only access across
+// every area. Sees users, reports, billing, and settings. Changes nothing
+// and performs no academic data entry.
+export const owner = ac.newRole({
+  user: ["list", "get"],
+  session: ["list"],
+  academic: ["view", "view-reports"],
+  fees: ["view"],
+  system: ["view"],
+});
+
+// Academic head. Owns curriculum, exams, promotions, teacher assignments,
+// and academic reports. User powers cover staff and student records only.
+// No role changes, bans, or admin account takeover. Fees and technical
+// areas stay view only.
 export const principal = ac.newRole({
   user: ["create", "list", "get", "update"],
-  session: ["list", "revoke"],
+  session: ["list"],
+  academic: [
+    "view",
+    "view-reports",
+    "manage-curriculum",
+    "manage-exams",
+    "manage-promotions",
+    "finalize-exams",
+    "manage-assignments",
+    "manage-attendance",
+    "manage-discipline",
+    "manage-timetable",
+  ],
+  fees: ["view"],
+  system: ["view"],
 });
 
+// Deputy academic head. Delegated ops only: attendance oversight,
+// discipline, and timetable, plus viewing academic reports. Explicitly
+// denied curriculum, exams, assignments, promotions, and board exam
+// finalization by omission.
 export const vicePrincipal = ac.newRole({
   user: ["list", "get", "update"],
   session: ["list"],
+  academic: [
+    "view",
+    "view-reports",
+    "manage-attendance",
+    "manage-discipline",
+    "manage-timetable",
+  ],
+  fees: ["view"],
+  system: ["view"],
 });
+
+// Only administrator holds privileged actions. The Admin plugin checks action
+// membership only, with no role hierarchy. Granting set-role or set-password
+// to principal or vice_principal would let them promote any account to
+// administrator or take over an administrator account. update is safe without
+// set-role, ban, or set-email because the plugin re-checks those actions
+// when the payload touches role, banned, or email fields.
 
 // Member roles browse their own dashboard area only in this pass.
 export const teacher = ac.newRole({});
@@ -54,7 +118,8 @@ export const officeStaff = ac.newRole({});
 export const librarian = ac.newRole({});
 
 export const roles = {
-  super_admin: superAdmin,
+  owner,
+  administrator,
   principal,
   vice_principal: vicePrincipal,
   teacher,
@@ -68,7 +133,8 @@ export const roles = {
 export type RoleName = keyof typeof roles;
 
 export const roleNames: RoleName[] = [
-  "super_admin",
+  "owner",
+  "administrator",
   "principal",
   "vice_principal",
   "teacher",
@@ -82,7 +148,8 @@ export const roleNames: RoleName[] = [
 export const defaultRole: RoleName = "student";
 
 export const roleLabels: Record<RoleName, string> = {
-  super_admin: "Super admin",
+  owner: "Owner",
+  administrator: "Administrator",
   principal: "Principal",
   vice_principal: "Vice principal",
   teacher: "Teacher",
@@ -94,7 +161,8 @@ export const roleLabels: Record<RoleName, string> = {
 };
 
 const roleUrlSlugs: Record<RoleName, string> = {
-  super_admin: "super-admin",
+  owner: "owner",
+  administrator: "administrator",
   principal: "principal",
   vice_principal: "vice-principal",
   teacher: "teacher",
@@ -103,6 +171,20 @@ const roleUrlSlugs: Record<RoleName, string> = {
   accountant: "accountant",
   office_staff: "office-staff",
   librarian: "librarian",
+};
+
+// Legacy slugs map to current roles so existing sessions and stored values
+// keep working after the super_admin to administrator rename.
+const legacyRoleAliases: Record<string, RoleName> = {
+  super_admin: "administrator",
+};
+
+const normalizeRolePart = (part: string): RoleName | null => {
+  if (roleNames.includes(part as RoleName)) {
+    return part as RoleName;
+  }
+  const aliased = legacyRoleAliases[part];
+  return aliased ?? null;
 };
 
 // The role field stores comma separated values when a user holds several roles.
@@ -114,9 +196,10 @@ export const parseRoleNames = (
     .map((part) => part.trim())
     .filter(Boolean);
 
-  return storedParts.filter((part): part is RoleName =>
-    roleNames.includes(part as RoleName),
-  );
+  return storedParts.flatMap((part) => {
+    const normalized = normalizeRolePart(part);
+    return normalized ? [normalized] : [];
+  });
 };
 
 export const firstRoleName = (stored: string | null | undefined): RoleName =>

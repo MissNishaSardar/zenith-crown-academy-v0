@@ -20,10 +20,16 @@ type SeedUser = {
 
 const seedUsers: SeedUser[] = [
   {
-    name: "Super Admin",
+    name: "Owner",
+    email: "owner@gmail.com",
+    username: "owner",
+    role: "owner",
+  },
+  {
+    name: "Administrator",
     email: "admin@gmail.com",
     username: "admin",
-    role: "super_admin",
+    role: "administrator",
   },
   {
     name: "Principal",

@@ -1,24 +1,7 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { requireRole } from "@/server/guards";
-
-export const metadata: Metadata = {
-  title: "Super admin",
+const SuperAdminRedirect = () => {
+  redirect("/dashboard/administrator");
 };
 
-const SuperAdminPage = async () => {
-  await requireRole("super_admin");
-
-  return (
-    <main className={"flex flex-1 items-center justify-center px-6 py-16"}>
-      <h1
-        className={
-          "font-heading text-foreground text-3xl font-bold tracking-tight"
-        }>
-        Super admin workspace
-      </h1>
-    </main>
-  );
-};
-
-export default SuperAdminPage;
+export default SuperAdminRedirect;

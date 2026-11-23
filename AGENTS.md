@@ -161,7 +161,7 @@ git commit -m @"
 - Re-run generate + migrate after adding Better Auth plugins.
 - Plugin order matters: custom plugins like `admin()` go BEFORE `nextCookies()`, which must stay last in the `plugins` array or cookies get dropped (server warning).
 - `bunx auth generate` regenerates `prisma/schema.prisma` from scratch: after every run, reapply the RBAC tightening on `User`: `role String @default("student")` and `banned Boolean @default(false)` (generate emits them as nullable), then migrate.
-- The admin CLI supports non interactive setup: `bunx auth create-admin --email <email> --name <name> --password <pw> --role super_admin` with env inline (`--role` accepts any slug from `src/lib/auth/permissions.ts`).
+- The admin CLI supports non interactive setup: `bunx auth create-admin --email <email> --name <name> --password <pw> --role administrator` with env inline (`--role` accepts any slug from `src/lib/auth/permissions.ts`).
 - Admin endpoints (set-role, ban, etc.) require an `Origin` header in curl or PowerShell tests, plus a session cookie; the client plugin handles it in-app.
 
 ## Agent orchestration and token efficiency
