@@ -50,6 +50,9 @@ next-env.d.ts
 # prisma
 generated
 prisma/dev.db
+# ignore future migrations (already tracked migrations stay tracked)
+prisma/migrations/*
+!prisma/migrations/migration_lock.toml
 
 # uploads
 public/uploads/*
@@ -57,3 +60,4 @@ public/uploads/*
 
 # local planning notes (kept out of the repo)
 tech.md
+tech-backup.md

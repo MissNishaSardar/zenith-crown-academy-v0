@@ -53,7 +53,16 @@ Engines: Node >= 24, bun >= 1.4. Package manager: bun.
 - **Never abandon in progress work**: when the user sends new information or a new task during ongoing work, do not drop the earlier build and jump to the newest request. Note the new input, fold it into the plan, and finish everything step by step in order: complete the current step, then the next, then apply the addition. Nothing is left half built unless the user explicitly confirms dropping it or changing the priority. For an urgent or conflicting addition, ask how to order the work instead of silently deciding.
 - **Revise all plans before building**: when plan mode is used and a build is about to start, do not jump straight into code. First reread every plan made in this session, recheck each item, and confirm no planned part was skipped or missed. Only begin the build once the full plan list checks out, and state the final revised plan before starting.
 - **Mocks are temporary HTML**: whenever the user asks for a mock, create temporary HTML files under the project and point to them so the result can be viewed directly in the browser. After the mock is approved and the real build is finished, delete the temporary mock files so nothing is left behind.
-- **Propagate issue fixes**: when the user reports an issue or asks for a fix, do not fix only the reported spot. First search the rest of the project for the same or a similar issue in related files, inform the user about every location where it also exists, then fix all of them together in one pass unless the user says otherwise.
+- **Propagate issue fixes**: when the user reports an issue or asks for a fix, do not fix only the reported spot. First search the rest of the project for the same or a similar issue in related files, inform the user about every location where it also exists, then fix all of them together in one pass unless the user says otherwise. Strict task scope still applies. Out of scope committed files need an explicit ask first.
+
+## Global build standard
+
+- **Small slices**: one goal per task. Max three to five files per task unless the user approves more. Each task lists goal, allowed files, out of scope, and verification. Never batch layout, nav, and all role pages in one giant change.
+- **Strict task scope for committed files**: task scope is permission. Edit only files named in the task. Any other committed file needs an explicit ask first, even if it shares logic. Read only sweep is allowed to find impact.
+- **shadcn frozen**: no edits inside `src/components/shadcnui/`. If a fix seems needed there, stop and ask with an alternate path using our own Layout or style layer.
+- **Zero duplicate on one page**: if repeated text, cards, or sections appear on the same page, stop and ask which one to keep before any edit.
+- **Touch once**: finish each file in one touch. Apply Tailwind order, spacing hygiene, unused imports, metadata, arrow functions, PascalCase, form Controller pattern, and button disabled with hasChanged plus 1500ms loader in the same edit. Reread the file after write because `prettier-plugin-tailwindcss` reorders classes.
+- **Close proof**: reread each touched file, run `bun run lint`, run headed Playwright screenshot for UI work and inspect layout, update `playwright-cli.md` in the same touch, confirm no TODO, no console log, no dead route, and no temp file left.
 
 ## Verification
 
