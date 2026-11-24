@@ -36,71 +36,99 @@ const statement = {
 
 export const ac = createAccessControl(statement);
 
-const allUserActions = [...statement.user];
-const allSessionActions = [...statement.session];
+type Statement = typeof statement;
 
-// Technical system administrator. Full user and session control plus school
-// config, integrations, backups, audit logs, sessions, classes, and fee
-// heads. Academic areas stay view only. No routine academic decisions.
-export const administrator = ac.newRole({
-  user: allUserActions,
-  session: allSessionActions,
-  academic: ["view", "view-reports"],
-  fees: ["view", "manage"],
-  system: ["view", "manage"],
-});
+type RoleStatement = {
+  [K in keyof Statement]?: Statement[K][number][];
+};
 
-// School owner. Non technical business role with read only access across
-// every area. Sees users, reports, billing, and settings. Changes nothing
-// and performs no academic data entry.
-export const owner = ac.newRole({
-  user: ["list", "get"],
-  session: ["list"],
-  academic: ["view", "view-reports"],
-  fees: ["view"],
-  system: ["view"],
-});
+type RoleKey =
+  | "owner"
+  | "administrator"
+  | "principal"
+  | "vice_principal"
+  | "teacher"
+  | "student"
+  | "parent"
+  | "accountant"
+  | "office_staff"
+  | "librarian";
 
-// Academic head. Owns curriculum, exams, promotions, teacher assignments,
-// and academic reports. User powers cover staff and student records only.
-// No role changes, bans, or admin account takeover. Fees and technical
-// areas stay view only.
-export const principal = ac.newRole({
-  user: ["create", "list", "get", "update"],
-  session: ["list"],
-  academic: [
-    "view",
-    "view-reports",
-    "manage-curriculum",
-    "manage-exams",
-    "manage-promotions",
-    "finalize-exams",
-    "manage-assignments",
-    "manage-attendance",
-    "manage-discipline",
-    "manage-timetable",
-  ],
-  fees: ["view"],
-  system: ["view"],
-});
+// Canonical role statements. Single edit point for both Better Auth
+// access control and the app level permission strings below.
+const ROLE_STATEMENTS: Record<RoleKey, RoleStatement> = {
+  // Technical system administrator. Full user and session control plus school
+  // config, integrations, backups, audit logs, sessions, classes, and fee
+  // heads. Academic areas stay view only. No routine academic decisions.
+  administrator: {
+    user: [...statement.user],
+    session: [...statement.session],
+    academic: ["view", "view-reports"],
+    fees: ["view", "manage"],
+    system: ["view", "manage"],
+  },
+  // School owner. Non technical business role with read only access across
+  // every area. Sees users, reports, billing, and settings. Changes nothing
+  // and performs no academic data entry.
+  owner: {
+    user: ["list", "get"],
+    session: ["list"],
+    academic: ["view", "view-reports"],
+    fees: ["view"],
+    system: ["view"],
+  },
+  // Academic head. Owns curriculum, exams, promotions, teacher assignments,
+  // and academic reports. User powers cover staff and student records only.
+  // No role changes, bans, or admin account takeover. Fees and technical
+  // areas stay view only.
+  principal: {
+    user: ["create", "list", "get", "update"],
+    session: ["list"],
+    academic: [
+      "view",
+      "view-reports",
+      "manage-curriculum",
+      "manage-exams",
+      "manage-promotions",
+      "finalize-exams",
+      "manage-assignments",
+      "manage-attendance",
+      "manage-discipline",
+      "manage-timetable",
+    ],
+    fees: ["view"],
+    system: ["view"],
+  },
+  // Deputy academic head. Delegated ops only: attendance oversight,
+  // discipline, and timetable, plus viewing academic reports. Explicitly
+  // denied curriculum, exams, assignments, promotions, and board exam
+  // finalization by omission.
+  vice_principal: {
+    user: ["list", "get", "update"],
+    session: ["list"],
+    academic: [
+      "view",
+      "view-reports",
+      "manage-attendance",
+      "manage-discipline",
+      "manage-timetable",
+    ],
+    fees: ["view"],
+    system: ["view"],
+  },
+  // Member roles browse their own dashboard area only in this pass.
+  teacher: {},
+  student: {},
+  parent: {},
+  accountant: {},
+  office_staff: {},
+  librarian: {},
+};
 
-// Deputy academic head. Delegated ops only: attendance oversight,
-// discipline, and timetable, plus viewing academic reports. Explicitly
-// denied curriculum, exams, assignments, promotions, and board exam
-// finalization by omission.
-export const vicePrincipal = ac.newRole({
-  user: ["list", "get", "update"],
-  session: ["list"],
-  academic: [
-    "view",
-    "view-reports",
-    "manage-attendance",
-    "manage-discipline",
-    "manage-timetable",
-  ],
-  fees: ["view"],
-  system: ["view"],
-});
+export const administrator = ac.newRole(ROLE_STATEMENTS.administrator);
+export const owner = ac.newRole(ROLE_STATEMENTS.owner);
+export const principal = ac.newRole(ROLE_STATEMENTS.principal);
+export const vicePrincipal = ac.newRole(ROLE_STATEMENTS.vice_principal);
 
 // Only administrator holds privileged actions. The Admin plugin checks action
 // membership only, with no role hierarchy. Granting set-role or set-password
@@ -110,12 +138,12 @@ export const vicePrincipal = ac.newRole({
 // when the payload touches role, banned, or email fields.
 
 // Member roles browse their own dashboard area only in this pass.
-export const teacher = ac.newRole({});
-export const student = ac.newRole({});
-export const parent = ac.newRole({});
-export const accountant = ac.newRole({});
-export const officeStaff = ac.newRole({});
-export const librarian = ac.newRole({});
+export const teacher = ac.newRole(ROLE_STATEMENTS.teacher);
+export const student = ac.newRole(ROLE_STATEMENTS.student);
+export const parent = ac.newRole(ROLE_STATEMENTS.parent);
+export const accountant = ac.newRole(ROLE_STATEMENTS.accountant);
+export const officeStaff = ac.newRole(ROLE_STATEMENTS.office_staff);
+export const librarian = ac.newRole(ROLE_STATEMENTS.librarian);
 
 export const roles = {
   owner,
@@ -211,6 +239,7 @@ const normalizeRolePart = (part: string): RoleName | null => {
 };
 
 // The role field stores comma separated values when a user holds several roles.
+// Order is preserved and duplicates are removed so first role stays primary.
 export const parseRoleNames = (
   stored: string | null | undefined,
 ): RoleName[] => {
@@ -219,10 +248,16 @@ export const parseRoleNames = (
     .map((part) => part.trim())
     .filter(Boolean);
 
-  return storedParts.flatMap((part) => {
+  const seen = new Set<RoleName>();
+  const out: RoleName[] = [];
+  for (const part of storedParts) {
     const normalized = normalizeRolePart(part);
-    return normalized ? [normalized] : [];
-  });
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
+      out.push(normalized);
+    }
+  }
+  return out;
 };
 
 export const firstRoleName = (stored: string | null | undefined): RoleName =>
@@ -232,3 +267,46 @@ export const roleUrlSlug = (role: RoleName): string => roleUrlSlugs[role];
 
 export const resolveRolePath = (role: string | null | undefined): string =>
   `/dashboard/${roleUrlSlugs[firstRoleName(role)]}`;
+
+// App level permission strings in singular form so server code matches the
+// Better Auth statement without a second vocabulary.
+export type Permission = {
+  [
+    K in keyof typeof statement
+  ]: `${K & string}:${(typeof statement)[K][number]}`;
+}[keyof typeof statement];
+
+// Derived role to permissions map used by UI filters and server guards.
+// Built from ROLE_STATEMENTS so ac roles and string checks cannot drift.
+const toPermissions = (role: RoleStatement): Permission[] =>
+  (Object.entries(role) as [keyof Statement, string[]][]).flatMap(
+    ([resource, actions]) =>
+      (actions ?? []).map((action) => `${resource}:${action}` as Permission),
+  );
+
+export const ROLE_PERMISSIONS: Record<RoleName, readonly Permission[]> = {
+  owner: toPermissions(ROLE_STATEMENTS.owner),
+  administrator: toPermissions(ROLE_STATEMENTS.administrator),
+  principal: toPermissions(ROLE_STATEMENTS.principal),
+  vice_principal: toPermissions(ROLE_STATEMENTS.vice_principal),
+  teacher: toPermissions(ROLE_STATEMENTS.teacher),
+  student: toPermissions(ROLE_STATEMENTS.student),
+  parent: toPermissions(ROLE_STATEMENTS.parent),
+  accountant: toPermissions(ROLE_STATEMENTS.accountant),
+  office_staff: toPermissions(ROLE_STATEMENTS.office_staff),
+  librarian: toPermissions(ROLE_STATEMENTS.librarian),
+};
+
+// True when any held role grants the permission. Accepts a stored role
+// string or a user object so call sites can pass session user directly.
+export const can = (
+  roleOrUser: string | { role?: string | null | undefined } | null | undefined,
+  permission: Permission,
+): boolean => {
+  const stored = typeof roleOrUser === "string" ? roleOrUser : roleOrUser?.role;
+  return parseRoleNames(stored).some((role) =>
+    ROLE_PERMISSIONS[role].includes(permission),
+  );
+};
+
+export const hasPermission = can;

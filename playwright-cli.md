@@ -159,3 +159,12 @@ Running record of tooling notes, UI element names, routes, and flow gotchas disc
 - Probe after the fix: frame gap 0px, main left padding 52px. Console 0 errors.
 - Gotcha: editing the shell class while the dev server holds a stale render shows a hydration mismatch with server HTML missing the new class and the spacing measures 0px. Restarting `next dev` clears it back to 0 console errors.
 - Review fixes: `resolveActiveRole` matches the URL segment after `/dashboard/` so nested routes and trailing slashes keep the right sidebar; `normalizeRolePart` also accepts hyphenated slugs and warns on truly unknown values instead of silently falling back to student; `BreadcrumbTrail` deps use the serialized items so inline array literals cannot refire the effect; crumb list keys are index qualified; `BreadcrumbItem.href` is typed as `Route`.
+
+## Permissions plus multirole plus audit build 2026-11-24
+
+- `permissions.ts` now carries singular `Permission`, fixed `ROLE_PERMISSIONS` mirroring `ac`, plus `can` and `hasPermission` with union across comma roles. `parseRoleNames` dedupes while keeping order.
+- `guards.ts` adds `requireAnyRole`, `requirePermission` redirecting to own first home, and `assertPermission` throwing `ForbiddenError` for actions.
+- `dashboard-nav.ts` lists every held workspace via `getDashboardLinks` stored role input with optional `requiredPermission` filter. `resolveActiveRole` is strict and falls back when the URL slug is not held. `DashboardShell` passes stored role only.
+- `AuditLog` model in schema plus `20261124165957_add_audit_log` migration, helper `src/server/audit.ts` fail closed with optional transaction client and secret redaction. All gated mutations must call it, reads never do. Better Auth admin writes stay a known gap.
+- Proof boundary is the administrator page on `system:manage`, held by administrator only today.
+- Verified: `bun run lint` passed, `lint:check` typegen plus tsc plus eslint passed after Json input fix. Headed login renders with 0 errors and 1 pre-existing logo sizing warning, unauthenticated `/dashboard` bounces to `/login`. Unit probes show multirole links, strict fallback, and redacted audit write then cleanup.

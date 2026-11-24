@@ -3,14 +3,14 @@ import type { Metadata } from "next";
 import { BreadcrumbTrail } from "@/components/Layout/Breadcrumbs";
 import PageHeader from "@/components/Layout/PageHeader";
 import { roleDescriptions, roleLabels } from "@/lib/auth/permissions";
-import { requireRole } from "@/server/guards";
+import { requirePermission } from "@/server/guards";
 
 export const metadata: Metadata = {
   title: "Administrator",
 };
 
 const AdministratorPage = async () => {
-  await requireRole("administrator");
+  await requirePermission("system:manage");
 
   return (
     <div className="flex flex-1 flex-col gap-6">

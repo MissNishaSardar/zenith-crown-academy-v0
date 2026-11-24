@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
-import { getDashboardLinks, resolveActiveRole } from "@/lib/dashboard-nav";
+import { getDashboardLinks } from "@/lib/dashboard-nav";
 
 import BreadcrumbProvider from "./Breadcrumbs";
 import DashboardHeader from "./DashboardHeader";
@@ -72,8 +72,7 @@ const DashboardShell = ({
     setMobileOpen(true);
   }, [pathname]);
 
-  const activeRole = resolveActiveRole(storedRole, pathname);
-  const links = getDashboardLinks(activeRole);
+  const links = getDashboardLinks(storedRole);
   const drawerOpen = mobileOpen && openAt === pathname;
 
   return (
