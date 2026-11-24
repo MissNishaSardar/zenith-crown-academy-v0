@@ -94,8 +94,8 @@ const DashboardShell = ({
             onOpenMobile={onOpenMobile}
             onToggle={onToggle}
           />
-          {/* Left gutter 52px = toggle 36 + row gap 8 + crumb padding 8, so page title aligns with breadcrumb text. */}
-          <main className="flex w-full flex-1 flex-col py-6 pr-6 pl-[52px] sm:pr-8 sm:pl-[52px]">
+          {/* Gutters stay 52px on both sides: left matches the header toggle plus gaps plus crumb padding so page title aligns with breadcrumb text, right mirrors it so cards sit centered. */}
+          <main className="flex w-full flex-1 flex-col px-[52px] py-6">
             {children}
           </main>
         </div>

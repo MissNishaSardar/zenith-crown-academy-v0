@@ -61,6 +61,12 @@ export const getDashboardLinks = (
       icon: roleIcons[role],
       label: `${roleLabels[role]} workspace`,
     })),
+    {
+      href: "/dashboard/administrator/users",
+      icon: Users,
+      label: "Users",
+      requiredPermission: "system:manage",
+    },
   ];
   return allLinks.filter(
     (link) =>

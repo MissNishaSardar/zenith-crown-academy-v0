@@ -26,7 +26,7 @@ const DashboardHeader = ({
   onToggle,
 }: DashboardHeaderProps) => (
   <header className="bg-sidebar/80 border-sidebar-border sticky top-0 z-40 h-16 shrink-0 border-b backdrop-blur-md">
-    <div className="flex h-full w-full items-center gap-2 pr-4 sm:pr-6">
+    <div className="flex h-full w-full items-center gap-2 pr-[52px]">
       <button
         type="button"
         aria-label="Open menu"

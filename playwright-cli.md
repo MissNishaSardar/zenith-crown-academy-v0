@@ -146,6 +146,39 @@ Running record of tooling notes, UI element names, routes, and flow gotchas disc
 - Sidebar, drawer, and header share the `bg-sidebar` surface with solid `border-sidebar-border` dividers so the shell reads as one frame around the content.
 - Verified: `bun run lint` passed. Headed browser at desktop and 390 widths, dark and light themes: flush toggle, contained collapsed mark, expanded brand intact, top-left headers with subtitles, distinct shell surface with solid dividers, console 0 errors 0 warnings. Wide 1920 check after cap removal: header and content run edge to edge with the toggle glued to the rail.
 
+## Shell symmetric 52px gutters (implemented 2026-11-25)
+
+- `DashboardShell` main went from `pr-6 pl-[52px] sm:pr-8 sm:pl-[52px]` to a flat `px-[52px]` at all widths, and `DashboardHeader` row went from `pr-4 sm:pr-6` to flat `pr-[52px]`. The left toggle stays glued to the rail and the crumb text still lands at 52, so the verified title and crumb alignment holds.
+- Probe against the layout viewport, not `innerWidth`, since headed Chromium classic scrollbars inflate `innerWidth` by 15 and fake a wider right gap. Desktop reads card left 116 (64 rail plus 52) with card and profile right gaps both exactly 52 and title to crumb delta 0. Mobile 390 reads 52 on all three. Document scroll width equals client width on both.
+- Screenshots: `.playwright-cli/gutters-desktop.png`, `gutters-mobile.png`.
+
+## Full data table swap (implemented 2026-11-25, user approved)
+
+- Replaced the native table with a TanStack plus shadcn data table. New dependency `@tanstack/react-table` installed with bun after explicit user approval. New shadcn primitives `table`, `badge` and `checkbox` added with the CLI next to the other frozen primitives. All three primitives arrived with a wrong `from "cn"` import and were fixed to `@/lib/utils`.
+- New files in `src/components/Admin/`: `UsersColumns.tsx` with column defs, sortable headers, status Badge, selection checkboxes and the disabled actions placeholder, plus `UsersDataTable.tsx` as a client table in manual pagination and sorting mode with URL driven state. Old `UsersTable.tsx` deleted. `page.tsx` parses and validates `sort` and `dir` params against an allowlist of name, username, email, role and created, default created ascending, and orders the Prisma query with id tiebreaker. Default sort params stay out of the URL.
+- Installed TanStack is v9 with a new store based `useTable`, but the build uses the officially exported legacy `useLegacyTable` plus `legacyCreateColumnHelper` from `@tanstack/react-table/legacy` with `flexRender`, `SortingState` and `RowSelectionState` types from the package root, since that matches the documented data table pattern. Typing gotchas solved with the installed dts: column value generics go features first, so the sortable header uses a structural column type, and the columns array goes through `columnHelper.columns()` which types defs with `any` value, matching the library idiom.
+- Verified: `bun run lint:check` passed. Headed browser as seed admin: 5 sort buttons present, name asc puts Accountant first and desc puts Vice Principal first with `sort` and `dir` visible in the URL, select all reports 10 selected on the page, invalid sort and dir fall back to the default list, mobile 390 keeps zero document level sideways scroll, console 0 errors 0 warnings. Screenshots: `.playwright-cli/datatable-desktop.png`, `datatable-selected.png`, `datatable-mobile.png`.
+
+## Users list review fixes (implemented 2026-11-24)
+
+- Toolbar search syncs from the live URL value during render, so footer Clear filters and back button no longer leave a stale query that the debounce re-applies. Render-time sync keeps the effect-free pattern that satisfies `react-hooks/set-state-in-effect`, and the debounce compares against the live URL value so role changes no longer double navigate. `hasFilter` trims the search text.
+- `UsersDataTable` remounts via `key` on page, search, role, banned, sort and dir, so row selection resets with the rows per the Step 1 acceptance.
+- Sorting back to default createdAt asc omits `sort` and `dir` from the URL, matching pagination links.
+- Role filter matches comma separated storage with comma boundaries, since plain `contains` would confuse principal with vice_principal. Display stays on the primary role.
+- `where` and clauses typed as `Prisma.UserWhereInput` with an `isSortKey` guard.
+- Removed unused direct `cn` dependency with `bun remove cn`. Shadcn primitives use `@/lib/utils`.
+- Verified: `bun run lint:check` passed (typegen plus tsc plus eslint).
+
+## Administrator Step 1 users list (implemented 2026-11-25)
+
+- Route: `src/app/(dashboard)/dashboard/administrator/users/page.tsx` as Server Component guarded by `requirePermission("system:manage")`, plus `loading.tsx` skeleton, client `UsersToolbar` (search with 300ms debounce, role and banned selects) and server `UsersTable` (columns name, username, email, role, status, created plus disabled actions placeholder, empty state, prev and next links) in `src/components/Admin/`, later replaced by the full data table swap above. Page size 10, order by createdAt asc plus id asc, total plus rows in one where clause, out of range pages clamp. Effective banned is computed per row as banned true plus expiry null or future. Nav adds a Users link gated on `system:manage` in `src/lib/dashboard-nav.ts`.
+- Search is plain Prisma `contains` on name, email and username with no insensitive mode. Mixed case `ADMIN` matched the admin row on libSQL SQLite, ASCII case folding holds, no raw SQL needed.
+- Dynamic hrefs need `as Route` casts for `router.replace` and `Link` with query strings under typedRoutes, same as the existing guards pattern.
+- Lint gotcha: syncing props into state with `useEffect` + `setState` trips `react-hooks/set-state-in-effect`. Fixed by deriving role and banned directly from `useSearchParams` and keeping only the search text as local state.
+- Real bug found and fixed: an `sr-only` span inside the actions `th` is absolutely positioned against the viewport from inside a table cell and stretched `documentElement.scrollWidth` to 789 at 390 widths with nothing visible painted. Bisected through thead, tbody, min width, silk, scrollbars and every ancestor before landing on the 1px span. Fix is `aria-label="Actions"` on the empty `th` instead of the span. Never put `sr-only` content inside `th` or `td` in a horizontally scrolling table.
+- Verified: `bun run lint:check` typegen plus tsc plus eslint passed. Headed browser as seed admin: list shows 10 of 10, mixed case search 1 of 1, role filter 1 of 1, banned filter empty state, `?page=99` clamps to page 1 of 1, student is bounced to `/dashboard/student`, typing in search rewrites the URL with debounce and resets to page 1, mobile 390 stacks with internal table scroll and zero document level sideways scroll. Screenshots: `.playwright-cli/step1-users-desktop.png`, `step1-users-search.png`, `step1-users-mobile.png`. Console 0 errors 0 warnings on the final pass. Seed passwords equal email, reseeded once when the local admin password was out of sync.
+- Note: `bunx @playwright/cli run-code --filename` scripts must be deleted after each check, and the dev server on port 3000 stays running for the next step.
+
 ## Login mocks deleted and header Sign in check (2026-11-06)
 
 - Deleted `mockups/login/` (all six HTML files). `mockups/` held only that folder, so the now empty parent was removed too; `git status` no longer lists `mockups/`.
