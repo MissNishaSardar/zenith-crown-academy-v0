@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
   typedRoutes: true,
+  experimental: {
+    agentUpgrade: "security",
+  },
 };
 
 export default nextConfig;
