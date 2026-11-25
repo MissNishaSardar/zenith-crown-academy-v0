@@ -2,6 +2,40 @@
 
 Running record of tooling notes, UI element names, routes, and flow gotchas discovered while browser testing.
 
+## M1 auth forms on shadcn primitives (implemented 2026-11-25)
+
+- `bunx shadcn add` is broken in this harness (undici `ERR_MODULE_NOT_FOUND` under Node 24). Primitives were written by hand from the base-vega registry JSON (`https://ui.shadcn.com/r/styles/base-vega/<name>.json`). New files: `dialog`, `input`, `label`, `select`, `field`, `native-select`, plus `separator` for the field dependency. Registry fixups applied on every file: `from "cn"` goes to `@/lib/utils`, `@/registry/base-vega/ui/*` goes to `@/components/shadcnui/*`, docs-site `IconPlaceholder` goes to lucide icons (`XIcon`, `ChevronDown`, `ChevronUp`, `CheckIcon`), `cn-menu-target cn-menu-translucent` classes dropped from the select popup, dialog title `cn-font-heading` fixed to `font-heading`. `field.tsx` needs an explicit `import * as React` for its `React.ComponentProps` types.
+- Migrated `LoginForm`, `ForgotPasswordForm`, `ResetPasswordForm` to `Field`, `FieldLabel`, `FieldError`, `FieldGroup`, `Input`, and the existing `Checkbox` for remember me. Compact shadcn sizing adopted everywhere per scope call: password show and hide toggles are icon-only `size="icon-sm"` with `pr-9` on the input, remember me is `Field orientation="horizontal"` with `w-auto` so the forgot link keeps its side. Root form errors and submit buttons untouched.
+- Checkbox Controller mapping: Base UI checkbox takes `checked` plus `onCheckedChange`, not `value` plus `onChange`, so destructure `{ value, onChange, onBlur, name }` and pass `checked={value}`, `onCheckedChange={(checked) => onChange(checked === true)}`. Omit the RHF `ref`, its input element type does not fit the button based primitive.
+- Auth pages bounce signed-in sessions, so verify forgot and reset in a fresh context: sign out via `POST /api/auth/sign-out` first, or the `goto` silently lands back on the workspace home. The reset form renders with any `?token=` value, validity is only checked on submit, so `?token=probe-only` proves the layout without touching credentials.
+- Verified: `bun run lint:check` passed. Headed browser: login desktop plus empty-submit errors plus real admin sign in to `/dashboard/administrator`, forgot, reset with probe token, mobile 390 with `scrollWidth` equal `clientWidth` (390/390), console 0 errors 0 warnings. Screenshots stay in `.playwright-cli/` with date stamped names.
+
+## M2 admin filters and role switcher on NativeSelect (implemented 2026-11-25)
+
+- Migrated `UsersToolbar`, `AuditFilters` and `RoleSwitcher` to `Field`, `FieldLabel` and `NativeSelect` with `NativeSelectOption`. No URL or filter logic changed. Duplicate `aria-label`s dropped where a `FieldLabel htmlFor` already associates the control. `Field className="sm:w-auto"` keeps mobile full width with desktop auto width; `NativeSelect className="w-full sm:w-44"` (status `sm:w-36`) preserves the old select widths. `RoleSwitcher` stays a badge for single-role users and a horizontal `Field` with full-width `NativeSelect` for multi-role users.
+- Native `select` keeps real browser behavior, so keyboard use and mobile pickers are unchanged. A11y tree shows `searchbox`, `combobox` with all options, and `group` wrappers.
+- Verified: `bun run lint:check` passed. Headed browser as seed admin: users toolbar renders new selects, role `teacher` select drives `?role=teacher&page=1` and narrows to 1 row, audit `?action=create` reflects in the Action select with the filtered empty state, profile menu switcher proven with a temporary `administrator,principal` DB role (combobox with both options, switching to principal lands on `/dashboard/principal`), DB reverted to `administrator` and the temp probe script deleted. Mobile 390 stacks full width with `scrollWidth` equal `clientWidth` (375/375), console 0 errors 0 warnings.
+
+## Step 3a create schema and helpers (implemented 2026-11-25)
+
+- `src/lib/zodSchema.ts` gains `assignableRoleNames` (9 roles, owner excluded) plus `createUserSchema` (name, username, email, role, password) with matching `createUserType`. Email and username normalize to lowercase, username mirrors the Better Auth username plugin rules (3 to 30 chars, letters numbers dots underscores), password enforces the 12 char 4-class rule, role rejects owner.
+- `src/lib/admin/usernames.ts` keeps the pure `buildUsernameCandidates` pure and adds DB-backed `suggestUsernames(name, db)` returning 3 free names in one `IN` query against taken usernames. The db argument is a structural type, so the module carries no prisma value import and stays safe to call from the 3b Server Action.
+- `src/lib/auth/passwordGenerator.ts` is pure and client safe: `crypto.getRandomValues` only with rejection sampling, one guaranteed upper lower number symbol, Fisher-Yates shuffle, default length 12. The 3b dialog imports this, never a server helper.
+- Verified with a throwaway `bun` probe (deleted after): 500 generated passwords all parse against the schema rule, candidates all lowercase in bounds with allowed chars and no dupes, live dev db suggestions for "Admin" return `admin1 admin2 admin3` with zero collisions, schema accepts a valid payload with lowercase normalization and rejects owner role, weak password and bad username chars. `bun run lint:check` passed.
+
+## Step 3b create action and dialog (implemented 2026-11-25)
+
+- `src/app/(dashboard)/dashboard/administrator/users/_actions.ts` holds `createUser` plus `getUsernameSuggestions`. `createUser` asserts `system:manage`, blocks `owner` at the raw input with a blocked audit row plus role field error, pre-checks email and username with friendly inline errors and fresh suggestions, creates through `auth.api.createUser` with `data: { username }` and session headers, then sets `username` plus `emailVerified: true` with Prisma and writes the create audit from a re-read row. P2002 races map to the matching field with fresh suggestions, everything else to a root error. Return values are plain serializable objects.
+- `src/components/Admin/CreateUserDialog.tsx` is a controlled dialog with the login form Controller pattern: name, username with server suggestion chips, email, role `NativeSelect` limited to the 9 assignable roles, password with dialog only generator plus show and hide. Submit stays disabled until dirty with the shared minimum loader. Success switches to a show once panel with copy button, secure share confirm, and a Done button that stays disabled until confirmed, then clears the password from state, closes, and refreshes the list.
+- `UsersToolbar` gains the `Create user` button and renders the dialog. No page change.
+- Verified: `bun run lint:check` passed. Headed browser as seed admin: dialog opens with submit disabled, suggestions appear from the typed name and fill on chip tap, duplicate email and taken username both show inline errors with the dialog open and fresh suggestions on the username error, success shows the one time password with working copy and a Done that enables only after confirm, Done closes and refreshes the list, audit `?action=create` shows both rows with safe fields only and an expanded diff with no password values, mobile 390 dialog stacks with no sideways scroll, console 0 errors 0 warnings. The two probe users were deleted after verification (accounts cascade, audit rows kept), so seeds are back to 10. The password success screenshot was deleted right after inspection.
+- Flake note: the first success view closed on its own before Done was clicked, focus returning to the toolbar button with no console error. The full flow was re-proven twice after that with the view stable through copy, confirm and Done, so treat the first close as environmental, not code. If it ever reproduces, suspect an unexpected `onOpenChange(false)` from the dialog primitive.
+
+## Actions move to src/server (2026-11-25, user decision)
+
+- The colocated `users/_actions.ts` moved to `src/server/admin/userActions.ts`, and `CreateUserDialog` imports from `@/server/admin/userActions`. The underscore is dropped because it only means non-routable inside route folders. Overturns the locked plan's colocated actions decision and the repo colocated `_actions` convention; Steps 4 and 5 will add their own per area files here. Content is byte identical apart from the import path.
+- Re-verified after the move: `bun run lint:check` passed, headed browser dialog opens and typing a name returns live suggestion chips through the moved action, console 0 errors 0 warnings.
+
 ## Tooling gotchas
 
 - The tool is now `@playwright/cli` (`bunx @playwright/cli ...`). The `playwright-cli` package is deprecated and errors with "could not determine executable to run".
@@ -179,6 +213,25 @@ Running record of tooling notes, UI element names, routes, and flow gotchas disc
 - Verified: `bun run lint:check` typegen plus tsc plus eslint passed. Headed browser as seed admin: list shows 10 of 10, mixed case search 1 of 1, role filter 1 of 1, banned filter empty state, `?page=99` clamps to page 1 of 1, student is bounced to `/dashboard/student`, typing in search rewrites the URL with debounce and resets to page 1, mobile 390 stacks with internal table scroll and zero document level sideways scroll. Screenshots: `.playwright-cli/step1-users-desktop.png`, `step1-users-search.png`, `step1-users-mobile.png`. Console 0 errors 0 warnings on the final pass. Seed passwords equal email, reseeded once when the local admin password was out of sync.
 - Note: `bunx @playwright/cli run-code --filename` scripts must be deleted after each check, and the dev server on port 3000 stays running for the next step.
 
+## Administrator empty states and pager fix (implemented 2026-11-25)
+
+- `src/components/Admin/AuditList.tsx` and `src/components/Admin/UsersDataTable.tsx` share the same two fixes. AuditList derives `hasFilter` as `entity !== "user" || action !== "all"`; UsersDataTable derives it as `search.trim() !== "" || role !== "all" || banned !== "all"`, mirroring `UsersToolbar`.
+- The empty-state Clear filters link now renders only when `rows.length === 0 && hasFilter`. At defaults it is gone and only the plain message shows.
+- Audit empty message is conditional: `No audit rows yet. User actions will appear here.` at defaults, `No audit rows match these filters.` when a filter is active. Users message already reads as a filtered message and stays.
+- Pager Previous and Next are now shadcn `Button` with the real `disabled` attribute plus router replace to the already built page hrefs, replacing the old anchor links with `aria-disabled`. AuditList gained `useRouter`; the now unused `cn` imports were removed.
+- Review fixes: audit Time cell now renders a server-formatted display string passed in `AuditRow.createdAtDisplay`, so server and client HTML agree regardless of timezone. `diffAuditFields` coalesces missing and `undefined` to `null` before comparing, so no phantom `— → —` rows.
+- Verified: `bun run lint:check` typegen plus tsc plus eslint passed with no warnings. Headed browser as seed admin: audit defaults show the fresh message with no Clear filters link and both pager buttons `disabled: true`; audit `?entity=all&action=ban` shows the match message plus the link; users defaults show rows with no link and both pager buttons disabled; users `?search=zzz-no-match` shows the match message plus the link; mobile 390 has zero document level sideways scroll; console 0 errors 0 warnings.
+- Screenshots: `.playwright-cli/fix-audit-default.png`, `fix-users-filtered.png`, `fix-audit-mobile.png`.
+
+## Administrator Step 2 audit viewer (implemented 2026-11-25)
+
+- Route: `src/app/(dashboard)/dashboard/administrator/audit/page.tsx` as Server Component guarded by `requirePermission("system:manage")`, default entity `user`, action `all`, page size 10, order latest first with id tiebreaker, out of range pages clamp. Filters stay in URL with defaults omitted. Invalid entity and action values fall back to `user` and `all`.
+- `src/server/audit.ts` adds `USER_AUDIT_FIELDS` allowlist (name, username, email, role, banned, banReason, banExpires, emailVerified), `toUserAuditSnapshot`, `diffAuditFields`, plus `AUDIT_USER_ACTION_OPTIONS` (ban, create, revoke, set-password, set-role, unban, update).
+- Client: `src/components/Admin/AuditFilters.tsx` (entity and action selects plus Clear) and `src/components/Admin/AuditList.tsx` (Badge columns, Details expand with changed fields diff plus full before and after JSON, empty state, prev and next links). `base` prop is typed `Route` so `Link href={base}` passes typegen.
+- Nav: `src/lib/dashboard-nav.ts` adds an Audit log link with `ScrollText` icon gated on `system:manage`.
+- Verified: `bun run lint:check` typegen plus tsc plus eslint passed. Headed browser as seed admin: empty state `No audit rows yet`, entity `all` plus action `ban` reflected in selects, bogus values fall back to user and all, `?page=99` clamps to Page 1 of 1, student1 is bounced to `/dashboard/student`, mobile 390 has zero document level sideways scroll with internal table scroll, console 0 errors 0 warnings on final passes. First audit page load after adding the route showed a stale dev hydration mismatch in the sidebar; a revisit cleared it with no code change. The mobile breadcrumb overlap with the profile avatar also appears on the users page, so it is pre-existing shell behavior, not from this step. Auth in checks ran through same-origin fetch sign in, no passwords in screenshots or logs.
+- Screenshots: `.playwright-cli/audit-desktop2.png`, `audit-mobile.png`, `audit-filtered.png`, `audit-users-mobile.png` (users comparison), `audit-users-recheck.png`.
+
 ## Login mocks deleted and header Sign in check (2026-11-06)
 
 - Deleted `mockups/login/` (all six HTML files). `mockups/` held only that folder, so the now empty parent was removed too; `git status` no longer lists `mockups/`.
@@ -201,3 +254,24 @@ Running record of tooling notes, UI element names, routes, and flow gotchas disc
 - `AuditLog` model in schema plus `20261124165957_add_audit_log` migration, helper `src/server/audit.ts` fail closed with optional transaction client and secret redaction. All gated mutations must call it, reads never do. Better Auth admin writes stay a known gap.
 - Proof boundary is the administrator page on `system:manage`, held by administrator only today.
 - Verified: `bun run lint` passed, `lint:check` typegen plus tsc plus eslint passed after Json input fix. Headed login renders with 0 errors and 1 pre-existing logo sizing warning, unauthenticated `/dashboard` bounces to `/login`. Unit probes show multirole links, strict fallback, and redacted audit write then cleanup.
+
+## Duplicate clear actions removed (implemented 2026-11-25)
+
+- Removed the empty-state `Clear filters` link from `src/components/Admin/AuditList.tsx` and `src/components/Admin/UsersDataTable.tsx`, including unused `Link` imports and the now unused `hasFilter` in the users table. Only the filter bar `Clear` button remains. Updated the stale `UsersToolbar.tsx` comment that still referenced the footer link.
+- Verified: `bun run lint` passed. Headed browser as seed admin: audit `?action=set-password` shows `No audit rows match these filters.` with top `Clear` enabled and no bottom link, clicking `Clear` lands on `?page=1` with rows and disabled `Clear`; users `?search=zzz-no-match` shows `No users match these filters.` with no bottom link; mobile 390 `scrollWidth` equals `clientWidth` (390/390); console 0 errors 0 warnings.
+
+## Audit details simplified (implemented 2026-11-25)
+
+- `src/components/Admin/AuditList.tsx` expanded view now shows only the changed fields diff list, with a `No field changes` fallback when empty. Removed the `Full before and after` JSON `details` block.
+- Verified: `bun run lint` passed. Headed browser as seed admin: audit list expands to diff items with no `Full before` text found, collapsed mobile 390 reads 390/390 with zero document sideways scroll, expanded mobile shows the pre-existing internal table scroll pattern, console 0 errors 0 warnings.
+
+## Credential handout on user creation (implemented 2026-11-25)
+
+- New pure helper `src/lib/admin/credentialHandout.ts` builds the text slip and file name from name, username, email, role label, temporary password, login URL and issue date. `CreateUserDialog.tsx` stores the created name, username, email and role from the create result plus the in memory password, shows an account details box, and adds Download plus Print slip buttons with 1500ms minimum loaders. Download saves a text file through a Blob URL. Print uses a hidden `credential-print-slip` block with print only CSS. Copy plus the shared confirm gate for Done are unchanged, and all handout state clears on Done and close.
+- Verified: `bun run lint` passed. Headed browser as seed admin created `handout.probe`: success view shows details plus Download and Print slip with Done disabled, Download saves `credentials-handout.probe.txt` with name, username, email, role, password and login URL, print slip exists hidden with the same details, checking the share box enables Done, Done closes and refreshes, probe user deleted afterwards with audit rows kept, mobile 390 `scrollWidth` equals `clientWidth` (375/375), console 0 errors 0 warnings.
+
+## Review fixes for handout and audit payload (implemented 2026-11-25)
+
+- `CreateUserDialog.tsx` now captures issue date and login URL once at creation success and reuses them for both outputs, so the Download file and the print slip carry identical Sign in and Issued lines. The role label is hoisted to one `displayRole` const used by the details box, the handout builder and the slip.
+- `AuditList.tsx` no longer carries row level `after` and `before`. The audit page still selects them for diff computation but no longer ships the full snapshots to the client. Added a comment at the rows mapping stating the select is for diffs only.
+- Verified: `bun run lint` passed. Headed browser as seed admin created `fix.probe2`: print slip DOM text contains Sign in URL and Issued lines matching the file shape, Download saves `credentials-fix.probe2.txt`, audit list loads 5 rows and expands diffs with no `Full before` text, console 0 errors 0 warnings. Probe user deleted afterwards.

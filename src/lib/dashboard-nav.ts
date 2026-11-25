@@ -9,6 +9,7 @@ import {
   HeartHandshake,
   LayoutDashboard,
   Library,
+  ScrollText,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -65,6 +66,12 @@ export const getDashboardLinks = (
       href: "/dashboard/administrator/users",
       icon: Users,
       label: "Users",
+      requiredPermission: "system:manage",
+    },
+    {
+      href: "/dashboard/administrator/audit",
+      icon: ScrollText,
+      label: "Audit log",
       requiredPermission: "system:manage",
     },
   ];

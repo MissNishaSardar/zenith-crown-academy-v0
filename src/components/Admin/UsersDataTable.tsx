@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -8,6 +7,7 @@ import type { RowSelectionState, SortingState } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
 import { getCoreRowModel, useLegacyTable } from "@tanstack/react-table/legacy";
 import type { Route } from "next";
+import { Button } from "@/components/shadcnui/button";
 import {
   Table,
   TableBody,
@@ -16,7 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/shadcnui/table";
-import { cn } from "@/lib/utils";
 
 import { usersColumns, type UsersRow } from "./UsersColumns";
 
@@ -174,15 +173,6 @@ const UsersDataTable = ({
           }
         </TableBody>
       </Table>
-      {rows.length === 0 ?
-        <div className="border-t px-4 py-3 text-center">
-          <Link
-            className="text-primary text-sm font-semibold underline-offset-4 hover:underline"
-            href={base}>
-            Clear filters
-          </Link>
-        </div>
-      : null}
       <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-muted-foreground text-sm">
           Showing {rows.length} of {total} users. Page {page} of {totalPages}.
@@ -191,24 +181,22 @@ const UsersDataTable = ({
           : null}
         </p>
         <div className="flex items-center gap-2">
-          <Link
-            aria-disabled={page <= 1}
-            className={cn(
-              "inline-flex h-8 items-center rounded-md border px-3 text-sm font-medium",
-              page <= 1 && "pointer-events-none opacity-50",
-            )}
-            href={prevHref}>
+          <Button
+            disabled={page <= 1}
+            onClick={() => router.replace(prevHref)}
+            size="sm"
+            type="button"
+            variant="outline">
             Previous
-          </Link>
-          <Link
-            aria-disabled={page >= totalPages}
-            className={cn(
-              "inline-flex h-8 items-center rounded-md border px-3 text-sm font-medium",
-              page >= totalPages && "pointer-events-none opacity-50",
-            )}
-            href={nextHref}>
+          </Button>
+          <Button
+            disabled={page >= totalPages}
+            onClick={() => router.replace(nextHref)}
+            size="sm"
+            type="button"
+            variant="outline">
             Next
-          </Link>
+          </Button>
         </div>
       </div>
     </div>

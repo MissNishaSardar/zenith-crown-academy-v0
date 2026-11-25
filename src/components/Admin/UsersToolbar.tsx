@@ -4,8 +4,17 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import type { Route } from "next";
+import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/shadcnui/button";
+import { Field, FieldLabel } from "@/components/shadcnui/field";
+import { Input } from "@/components/shadcnui/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/shadcnui/native-select";
 import { roleLabels, roleNames } from "@/lib/auth/permissions";
+
+import CreateUserDialog from "./CreateUserDialog";
 
 type UsersToolbarProps = {
   initialBanned: string;
@@ -43,7 +52,7 @@ const UsersToolbar = ({
 
   // Live URL search is the source of truth after mount. Sync it into local
   // state during render so the box never goes stale when the URL changes
-  // elsewhere, such as the footer Clear filters link or the back button.
+  // elsewhere, such as the back button.
   // Typing does not touch the URL until the debounce below fires, so
   // in progress keystrokes are preserved. An effect based sync would trip
   // react-hooks/set-state-in-effect.
@@ -52,6 +61,7 @@ const UsersToolbar = ({
     .slice(0, 100);
   const [search, setSearch] = useState(initialSearch);
   const [prevUrlSearch, setPrevUrlSearch] = useState(urlSearch);
+  const [createOpen, setCreateOpen] = useState(false);
   if (prevUrlSearch !== urlSearch) {
     setPrevUrlSearch(urlSearch);
     setSearch(urlSearch);
@@ -91,62 +101,46 @@ const UsersToolbar = ({
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-end sm:gap-4">
-      <div className="flex-1">
-        <label
-          className="mb-2 block text-[13.5px] font-semibold"
-          htmlFor="users-search">
-          Search users
-        </label>
-        <input
-          aria-label="Search users"
-          autoComplete="off"
-          className="border-input bg-background/60 placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-xl border px-3.5 text-sm outline-none focus-visible:ring-[3px]"
+      <Field className="flex-1">
+        <FieldLabel htmlFor="users-search">Search users</FieldLabel>
+        <Input
           id="users-search"
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Name, email or username"
           type="search"
+          autoComplete="off"
+          placeholder="Name, email or username"
           value={search}
+          onChange={(event) => setSearch(event.target.value)}
         />
-      </div>
-      <div>
-        <label
-          className="mb-2 block text-[13.5px] font-semibold"
-          htmlFor="users-role">
-          Role
-        </label>
-        <select
-          aria-label="Filter by role"
-          className="border-input bg-background/60 focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-xl border px-3 text-sm outline-none focus-visible:ring-[3px] sm:w-44"
+      </Field>
+      <Field className="sm:w-auto">
+        <FieldLabel htmlFor="users-role">Role</FieldLabel>
+        <NativeSelect
           id="users-role"
+          value={role}
           onChange={(event) => handleRoleChange(event.target.value)}
-          value={role}>
-          <option value="all">All roles</option>
+          className="w-full sm:w-44">
+          <NativeSelectOption value="all">All roles</NativeSelectOption>
           {roleNames.map((roleName) => (
-            <option
+            <NativeSelectOption
               key={roleName}
               value={roleName}>
               {roleLabels[roleName]}
-            </option>
+            </NativeSelectOption>
           ))}
-        </select>
-      </div>
-      <div>
-        <label
-          className="mb-2 block text-[13.5px] font-semibold"
-          htmlFor="users-banned">
-          Status
-        </label>
-        <select
-          aria-label="Filter by status"
-          className="border-input bg-background/60 focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-xl border px-3 text-sm outline-none focus-visible:ring-[3px] sm:w-36"
+        </NativeSelect>
+      </Field>
+      <Field className="sm:w-auto">
+        <FieldLabel htmlFor="users-banned">Status</FieldLabel>
+        <NativeSelect
           id="users-banned"
+          value={banned}
           onChange={(event) => handleBannedChange(event.target.value)}
-          value={banned}>
-          <option value="all">All</option>
-          <option value="active">Active</option>
-          <option value="banned">Banned</option>
-        </select>
-      </div>
+          className="w-full sm:w-36">
+          <NativeSelectOption value="all">All</NativeSelectOption>
+          <NativeSelectOption value="active">Active</NativeSelectOption>
+          <NativeSelectOption value="banned">Banned</NativeSelectOption>
+        </NativeSelect>
+      </Field>
       <Button
         disabled={!hasFilter}
         onClick={() => {
@@ -157,6 +151,16 @@ const UsersToolbar = ({
         variant="outline">
         Clear
       </Button>
+      <Button
+        onClick={() => setCreateOpen(true)}
+        type="button">
+        <PlusIcon aria-hidden="true" />
+        Create user
+      </Button>
+      <CreateUserDialog
+        onOpenChange={setCreateOpen}
+        open={createOpen}
+      />
     </div>
   );
 };
