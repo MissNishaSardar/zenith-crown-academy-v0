@@ -169,3 +169,90 @@ export const setPasswordSchema = z.object({
 });
 
 export type setPasswordType = z.infer<typeof setPasswordSchema>;
+
+const banDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+const isValidCalendarDate = (value: string): boolean => {
+  const parts = value.split("-");
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day)
+  ) {
+    return false;
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return false;
+  }
+  const date = new Date(year, month - 1, day);
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+};
+
+const isTodayOrFutureDate = (value: string): boolean => {
+  const day = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(day.getTime())) {
+    return false;
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return day >= today;
+};
+
+export const banUserSchema = z
+  .object({
+    banExpires: z.string().trim().optional(),
+    banReason: z
+      .string()
+      .trim()
+      .min(1, { error: "Enter a reason" })
+      .max(500, { error: "Reason is too long" }),
+    id: z.string().min(1, { error: "Missing user id" }),
+  })
+  .superRefine((data, ctx) => {
+    const raw = data.banExpires?.trim() ?? "";
+    if (raw === "") {
+      return;
+    }
+    if (!banDatePattern.test(raw) || !isValidCalendarDate(raw)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Pick a valid date",
+        path: ["banExpires"],
+      });
+      return;
+    }
+    if (!isTodayOrFutureDate(raw)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Pick today or a future date",
+        path: ["banExpires"],
+      });
+    }
+  });
+
+export type banUserType = z.infer<typeof banUserSchema>;
+
+export const unbanUserSchema = z.object({
+  id: z.string().min(1, { error: "Missing user id" }),
+});
+
+export type unbanUserType = z.infer<typeof unbanUserSchema>;
+
+export const revokeSessionSchema = z.object({
+  sessionId: z.string().min(1, { error: "Missing session" }),
+});
+
+export type revokeSessionType = z.infer<typeof revokeSessionSchema>;
+
+export const impersonateUserSchema = z.object({
+  userId: z.string().min(1, { error: "Missing user id" }),
+});
+
+export type impersonateUserType = z.infer<typeof impersonateUserSchema>;

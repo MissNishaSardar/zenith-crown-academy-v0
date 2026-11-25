@@ -171,9 +171,6 @@ const UsersPage = async ({ searchParams }: UsersPageProps) => {
         initialSearch={search}
       />
       <UsersDataTable
-        // Remount on any list param change so row selection resets with the
-        // rows instead of lingering invisibly across pages.
-        key={`${page}-${search}-${role}-${bannedFilter}-${sort}-${dir}`}
         banned={bannedFilter}
         dir={dir}
         page={page}

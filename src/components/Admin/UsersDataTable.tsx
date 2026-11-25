@@ -1,9 +1,8 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
 
-import type { RowSelectionState, SortingState } from "@tanstack/react-table";
+import type { SortingState } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
 import { getCoreRowModel, useLegacyTable } from "@tanstack/react-table/legacy";
 import type { Route } from "next";
@@ -77,18 +76,15 @@ const UsersDataTable = ({
 }: UsersDataTableProps) => {
   const router = useRouter();
   const pathname = usePathname();
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const table = useLegacyTable({
     autoResetPageIndex: false,
     columns: usersColumns,
     data: rows,
-    enableRowSelection: true,
     getCoreRowModel: getCoreRowModel(),
     getRowId: (row) => row.id,
     manualPagination: true,
     manualSorting: true,
-    onRowSelectionChange: setRowSelection,
     onSortingChange: (updater) => {
       const next = typeof updater === "function" ? updater(sorting) : updater;
       const first = next[0];
@@ -114,7 +110,6 @@ const UsersDataTable = ({
     pageCount: totalPages,
     state: {
       pagination: { pageIndex: page - 1, pageSize },
-      rowSelection,
       sorting,
     },
   });
@@ -129,7 +124,6 @@ const UsersDataTable = ({
     { ...shared, page: Math.min(totalPages, page + 1) },
     base,
   ) as Route;
-  const selectedCount = table.getFilteredSelectedRowModel().rows.length;
 
   return (
     <div className="overflow-hidden rounded-xl border">
@@ -153,9 +147,7 @@ const UsersDataTable = ({
         <TableBody>
           {table.getRowModel().rows.length > 0 ?
             table.getRowModel().rows.map((row) => (
-              <TableRow
-                data-state={row.getIsSelected() && "selected"}
-                key={row.id}>
+              <TableRow key={row.id}>
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -176,9 +168,6 @@ const UsersDataTable = ({
       <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-muted-foreground text-sm">
           Showing {rows.length} of {total} users. Page {page} of {totalPages}.
-          {selectedCount > 0 ?
-            ` ${selectedCount} selected on this page.`
-          : null}
         </p>
         <div className="flex items-center gap-2">
           <Button

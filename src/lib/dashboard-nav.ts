@@ -7,6 +7,7 @@ import {
   Crown,
   GraduationCap,
   HeartHandshake,
+  KeyRound,
   LayoutDashboard,
   Library,
   ScrollText,
@@ -72,6 +73,12 @@ export const getDashboardLinks = (
       href: "/dashboard/administrator/audit",
       icon: ScrollText,
       label: "Audit log",
+      requiredPermission: "system:manage",
+    },
+    {
+      href: "/dashboard/administrator/sessions",
+      icon: KeyRound,
+      label: "Sessions",
       requiredPermission: "system:manage",
     },
   ];

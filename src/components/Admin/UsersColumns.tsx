@@ -3,7 +3,6 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { legacyCreateColumnHelper } from "@tanstack/react-table/legacy";
 import { Badge } from "@/components/shadcnui/badge";
 import { Button } from "@/components/shadcnui/button";
-import { Checkbox } from "@/components/shadcnui/checkbox";
 import { roleLabels, type RoleName } from "@/lib/auth/permissions";
 
 import UserRowActions from "./UserRowActions";
@@ -56,24 +55,6 @@ const SortableHeader = ({
 const columnHelper = legacyCreateColumnHelper<UsersRow>();
 
 export const usersColumns = columnHelper.columns([
-  columnHelper.display({
-    cell: ({ row }) => (
-      <Checkbox
-        aria-label={`Select ${row.original.name}`}
-        checked={row.getIsSelected()}
-        onCheckedChange={(checked) => row.toggleSelected(checked)}
-      />
-    ),
-    header: ({ table }) => (
-      <Checkbox
-        aria-label="Select all users on this page"
-        checked={table.getIsAllPageRowsSelected()}
-        indeterminate={table.getIsSomePageRowsSelected()}
-        onCheckedChange={(checked) => table.toggleAllPageRowsSelected(checked)}
-      />
-    ),
-    id: "select",
-  }),
   columnHelper.accessor("name", {
     cell: ({ getValue }) => <span className="font-medium">{getValue()}</span>,
     header: ({ column }) => (

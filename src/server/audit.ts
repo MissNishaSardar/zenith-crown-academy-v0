@@ -51,8 +51,6 @@ const SENSITIVE_KEYS = new Set([
   "id_token",
   "sessiontoken",
   "session_token",
-  "sessionid",
-  "session_id",
   "secret",
   "apikey",
   "api_key",
@@ -61,13 +59,16 @@ const SENSITIVE_KEYS = new Set([
   "cookies",
 ]);
 
+// Note: session ids (sessionId) are intentionally not redacted. They are
+// database row ids needed to identify which session was revoked. Session
+// tokens (sessionToken) stay redacted through the token entries above plus
+// the token substring below.
 const SENSITIVE_SUBSTRINGS = [
   "password",
   "passwd",
   "token",
   "secret",
   "cookie",
-  "session",
   "authorization",
   "apikey",
 ];
@@ -225,9 +226,11 @@ export const AUDIT_ENTITY_OPTIONS = ["user"] as const;
 export const AUDIT_USER_ACTION_OPTIONS = [
   "ban",
   "create",
+  "impersonate",
   "revoke",
   "set-password",
   "set-role",
+  "stop-impersonating",
   "unban",
   "update",
 ] as const;

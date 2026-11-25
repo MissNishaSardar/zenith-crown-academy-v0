@@ -1,9 +1,14 @@
 "use client";
 
+import { Loader2Icon } from "lucide-react";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
+import { Button } from "@/components/shadcnui/button";
+import { authClient } from "@/lib/auth-client";
+import { withMinimumLoad } from "@/lib/auth/withMinimumLoad";
+import { stopImpersonation } from "@/server/admin/sessionActions";
 import { getDashboardLinks } from "@/lib/dashboard-nav";
 
 import BreadcrumbProvider from "./Breadcrumbs";
@@ -30,6 +35,81 @@ type DashboardShellProps = {
   userEmail: string;
   userImage: string | null | undefined;
   userName: string;
+  initialImpersonatedBy?: string | null | undefined;
+  initialImpersonatedName?: string | null | undefined;
+};
+
+const ImpersonationBanner = ({
+  initialImpersonatedBy,
+  initialImpersonatedName,
+}: {
+  initialImpersonatedBy?: string | null | undefined;
+  initialImpersonatedName?: string | null | undefined;
+}) => {
+  const { data } = authClient.useSession();
+  const [isStopping, setIsStopping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const clientImpersonatedBy = (
+    data?.session as unknown as
+      { impersonatedBy?: string | null | undefined } | undefined
+  )?.impersonatedBy;
+  // Show the banner when either the server layout or the client session
+  // reports impersonation, so a stale or reshaped client session can never
+  // silently hide the indicator.
+  const impersonatedBy = clientImpersonatedBy ?? initialImpersonatedBy ?? null;
+  const impersonatedName =
+    data?.user?.name ?? initialImpersonatedName ?? "user";
+
+  if (!impersonatedBy) {
+    return null;
+  }
+
+  const handleStop = async () => {
+    if (isStopping) {
+      return;
+    }
+    setIsStopping(true);
+    setError(null);
+    const result = await withMinimumLoad(stopImpersonation());
+    setIsStopping(false);
+    if (!result.ok) {
+      setError(result.errors.root ?? "Could not stop impersonation.");
+      return;
+    }
+    window.location.assign("/dashboard");
+  };
+
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm">
+      <span>You are impersonating {impersonatedName}.</span>
+      {error ?
+        <span
+          role="alert"
+          className="text-destructive">
+          {error}
+        </span>
+      : null}
+      <Button
+        disabled={isStopping}
+        onClick={handleStop}
+        size="sm"
+        type="button"
+        variant="outline">
+        {isStopping ?
+          <>
+            <Loader2Icon
+              aria-hidden="true"
+              className="animate-spin"
+            />
+            Stopping
+          </>
+        : "Stop impersonating"}
+      </Button>
+    </div>
+  );
 };
 
 const DashboardShell = ({
@@ -38,6 +118,8 @@ const DashboardShell = ({
   userEmail,
   userImage,
   userName,
+  initialImpersonatedBy,
+  initialImpersonatedName,
 }: DashboardShellProps) => {
   const pathname = usePathname();
   const collapsed = useSyncExternalStore(
@@ -77,6 +159,10 @@ const DashboardShell = ({
 
   return (
     <BreadcrumbProvider>
+      <ImpersonationBanner
+        initialImpersonatedBy={initialImpersonatedBy}
+        initialImpersonatedName={initialImpersonatedName ?? userName}
+      />
       <div className="flex min-h-svh">
         <DashboardSidebar
           collapsed={collapsed}

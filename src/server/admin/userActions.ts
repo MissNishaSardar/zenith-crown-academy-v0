@@ -12,13 +12,17 @@ import {
 } from "@/lib/admin/usernames";
 import prisma from "@/lib/dbClient/prisma";
 import {
+  banUserSchema,
   createUserSchema,
   setPasswordSchema,
   setRoleSchema,
+  unbanUserSchema,
   updateUserSchema,
+  type banUserType,
   type createUserType,
   type setPasswordType,
   type setRoleType,
+  type unbanUserType,
   type updateUserType,
 } from "@/lib/zodSchema";
 import { logAudit, toUserAuditSnapshot } from "@/server/audit";
@@ -469,6 +473,243 @@ export const setPassword = async (
   } catch {
     return {
       errors: { root: "Could not reset this password. Try again." },
+      ok: false,
+    };
+  }
+};
+
+export type BanUserResult =
+  | {
+      user: { id: string };
+      ok: true;
+    }
+  | {
+      errors: Partial<Record<"banExpires" | "banReason" | "root", string>>;
+      ok: false;
+    };
+
+export const banUser = async (input: banUserType): Promise<BanUserResult> => {
+  const session = await assertPermission("system:manage");
+  const actor = {
+    email: session.user.email,
+    id: session.user.id,
+    role: session.user.role,
+  };
+
+  const parsed = banUserSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: Partial<Record<"banExpires" | "banReason", string>> = {};
+    for (const issue of parsed.error.issues) {
+      const field = issue.path[0];
+      if (
+        (field === "banReason" || field === "banExpires") &&
+        !fieldErrors[field]
+      ) {
+        fieldErrors[field] = issue.message;
+      }
+    }
+    if (Object.keys(fieldErrors).length > 0) {
+      return {
+        errors: fieldErrors,
+        ok: false,
+      };
+    }
+    return {
+      errors: { root: "Check the highlighted fields and try again." },
+      ok: false,
+    };
+  }
+  const { banExpires, banReason, id } = parsed.data;
+
+  const target = await prisma.user.findUnique({
+    where: { id },
+  });
+  if (!target) {
+    return {
+      errors: { root: "This user no longer exists." },
+      ok: false,
+    };
+  }
+  if (isOwnerStoredRole(target.role)) {
+    await logAudit({
+      action: "ban",
+      actor,
+      after: { blocked: true, reason: "owner-blocked" },
+      before: toUserAuditSnapshot(target),
+      entity: "user",
+      entityId: target.id,
+    });
+    return {
+      errors: { root: "Owner accounts cannot be changed here." },
+      ok: false,
+    };
+  }
+  if (actor.id === target.id) {
+    await logAudit({
+      action: "ban",
+      actor,
+      after: { blocked: true, reason: "self-ban-blocked" },
+      before: toUserAuditSnapshot(target),
+      entity: "user",
+      entityId: target.id,
+    });
+    return {
+      errors: { root: "You cannot ban your own account." },
+      ok: false,
+    };
+  }
+
+  const reason = banReason.trim();
+  const expiryRaw = banExpires?.trim() ? banExpires.trim() : undefined;
+  let banExpiresIn: number | undefined;
+  if (expiryRaw) {
+    const expiryDate = new Date(`${expiryRaw}T23:59:59.999`);
+    if (Number.isNaN(expiryDate.getTime())) {
+      return {
+        errors: { banExpires: "Pick a valid date." },
+        ok: false,
+      };
+    }
+    banExpiresIn = Math.ceil((expiryDate.getTime() - Date.now()) / 1000);
+    if (banExpiresIn <= 0) {
+      return {
+        errors: { banExpires: "Pick today or a future date." },
+        ok: false,
+      };
+    }
+  }
+
+  try {
+    const before = toUserAuditSnapshot(target);
+    const requestHeaders = await headers();
+    await auth.api.banUser({
+      body: {
+        banReason: reason,
+        ...(banExpiresIn ? { banExpiresIn } : {}),
+        userId: id,
+      },
+      headers: requestHeaders,
+    });
+    // Better Auth banUser already deletes every session for the user, so no
+    // separate revokeUserSessions call is needed here. The revoke audit below
+    // documents that side effect for the audit viewer.
+    const row = await prisma.user.findUniqueOrThrow({
+      where: { id },
+    });
+    await logAudit({
+      action: "ban",
+      actor,
+      after: toUserAuditSnapshot(row),
+      before,
+      entity: "user",
+      entityId: row.id,
+    });
+    await logAudit({
+      action: "revoke",
+      actor,
+      after: { reason: "ban", userId: id },
+      before: null,
+      entity: "user",
+      entityId: id,
+    });
+    return { ok: true, user: { id: row.id } };
+  } catch {
+    return {
+      errors: { root: "Could not ban this user. Try again." },
+      ok: false,
+    };
+  }
+};
+
+export type UnbanUserResult =
+  | {
+      user: { id: string };
+      ok: true;
+    }
+  | {
+      errors: Partial<Record<"root", string>>;
+      ok: false;
+    };
+
+export const unbanUser = async (
+  input: unbanUserType,
+): Promise<UnbanUserResult> => {
+  const session = await assertPermission("system:manage");
+  const actor = {
+    email: session.user.email,
+    id: session.user.id,
+    role: session.user.role,
+  };
+
+  const parsed = unbanUserSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      errors: { root: "Check the highlighted fields and try again." },
+      ok: false,
+    };
+  }
+  const { id } = parsed.data;
+
+  const target = await prisma.user.findUnique({
+    where: { id },
+  });
+  if (!target) {
+    return {
+      errors: { root: "This user no longer exists." },
+      ok: false,
+    };
+  }
+  if (isOwnerStoredRole(target.role)) {
+    await logAudit({
+      action: "unban",
+      actor,
+      after: { blocked: true, reason: "owner-blocked" },
+      before: toUserAuditSnapshot(target),
+      entity: "user",
+      entityId: target.id,
+    });
+    return {
+      errors: { root: "Owner accounts cannot be changed here." },
+      ok: false,
+    };
+  }
+  if (actor.id === target.id) {
+    await logAudit({
+      action: "unban",
+      actor,
+      after: { blocked: true, reason: "self-unban-blocked" },
+      before: toUserAuditSnapshot(target),
+      entity: "user",
+      entityId: target.id,
+    });
+    return {
+      errors: { root: "You cannot change your own ban status." },
+      ok: false,
+    };
+  }
+
+  try {
+    const before = toUserAuditSnapshot(target);
+    const requestHeaders = await headers();
+    await auth.api.unbanUser({
+      body: { userId: id },
+      headers: requestHeaders,
+    });
+    const row = await prisma.user.findUniqueOrThrow({
+      where: { id },
+    });
+    await logAudit({
+      action: "unban",
+      actor,
+      after: toUserAuditSnapshot(row),
+      before,
+      entity: "user",
+      entityId: row.id,
+    });
+    return { ok: true, user: { id: row.id } };
+  } catch {
+    return {
+      errors: { root: "Could not unban this user. Try again." },
       ok: false,
     };
   }
