@@ -1,10 +1,12 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
 import { legacyCreateColumnHelper } from "@tanstack/react-table/legacy";
-import { Button } from "@/components/shadcnui/button";
 import { Badge } from "@/components/shadcnui/badge";
+import { Button } from "@/components/shadcnui/button";
 import { Checkbox } from "@/components/shadcnui/checkbox";
 import { roleLabels, type RoleName } from "@/lib/auth/permissions";
+
+import UserRowActions from "./UserRowActions";
 
 export type UsersRow = {
   createdAt: Date;
@@ -13,6 +15,7 @@ export type UsersRow = {
   id: string;
   name: string;
   role: RoleName;
+  roles: RoleName[];
   username: string;
 };
 
@@ -108,7 +111,13 @@ export const usersColumns = columnHelper.columns([
     ),
   }),
   columnHelper.accessor("role", {
-    cell: ({ getValue }) => roleLabels[getValue()],
+    cell: ({ row }) => {
+      const roles =
+        row.original.roles.length > 0 ?
+          row.original.roles
+        : [row.original.role];
+      return roles.map((role) => roleLabels[role]).join(", ");
+    },
     header: ({ column }) => (
       <SortableHeader
         column={column}
@@ -141,17 +150,7 @@ export const usersColumns = columnHelper.columns([
     ),
   }),
   columnHelper.display({
-    cell: ({ row }) => (
-      <Button
-        aria-label={`Actions for ${row.original.name}`}
-        disabled
-        size="icon-sm"
-        title="User actions arrive in later steps"
-        type="button"
-        variant="ghost">
-        <MoreHorizontal aria-hidden="true" />
-      </Button>
-    ),
+    cell: ({ row }) => <UserRowActions user={row.original} />,
     enableSorting: false,
     header: "",
     id: "actions",

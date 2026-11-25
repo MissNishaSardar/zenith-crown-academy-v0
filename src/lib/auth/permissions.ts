@@ -260,6 +260,47 @@ export const parseRoleNames = (
   return out;
 };
 
+// Allowed role combinations. Single roles are always allowed. Only these
+// pairs may combine, in either order, with first checked staying primary:
+// Parent with Teacher, Office staff, Librarian or Accountant, and Teacher
+// with Principal or Vice principal.
+const allowedRolePairs: ReadonlySet<string> = new Set([
+  "accountant+parent",
+  "librarian+parent",
+  "office_staff+parent",
+  "parent+teacher",
+  "principal+teacher",
+  "teacher+vice_principal",
+]);
+
+export const findIncompatibleRoleCombo = (
+  roles: readonly RoleName[],
+): string | null => {
+  const unique = [...new Set(roles)];
+  if (unique.length <= 1) {
+    return null;
+  }
+  if (unique.length === 2) {
+    const key = [...unique].sort().join("+");
+    if (allowedRolePairs.has(key)) {
+      return null;
+    }
+  }
+  if (unique.includes("student")) {
+    return "Student cannot be combined with other roles. Use a separate account for staff duties.";
+  }
+  if (unique.includes("principal") && unique.includes("vice_principal")) {
+    return "Principal and Vice principal cannot be held together.";
+  }
+  if (
+    (unique.includes("principal") || unique.includes("vice_principal")) &&
+    unique.includes("accountant")
+  ) {
+    return "Academic leadership cannot be combined with Accountant. Use separate accounts.";
+  }
+  return "Only single roles or allowed pairs may be used. Allowed pairs are Parent with Teacher, Office staff, Librarian or Accountant, and Teacher with Principal or Vice principal.";
+};
+
 export const firstRoleName = (stored: string | null | undefined): RoleName =>
   parseRoleNames(stored)[0] ?? defaultRole;
 

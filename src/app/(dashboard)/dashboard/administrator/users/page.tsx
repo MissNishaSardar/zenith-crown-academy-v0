@@ -3,7 +3,11 @@ import type { Metadata } from "next";
 import { BreadcrumbTrail } from "@/components/Layout/Breadcrumbs";
 import PageHeader from "@/components/Layout/PageHeader";
 import prisma from "@/lib/dbClient/prisma";
-import { firstRoleName, roleNames } from "@/lib/auth/permissions";
+import {
+  firstRoleName,
+  parseRoleNames,
+  roleNames,
+} from "@/lib/auth/permissions";
 import { requirePermission } from "@/server/guards";
 
 import type { SortingState } from "@tanstack/react-table";
@@ -141,6 +145,7 @@ const UsersPage = async ({ searchParams }: UsersPageProps) => {
     id: user.id,
     name: user.name,
     role: firstRoleName(user.role),
+    roles: parseRoleNames(user.role),
     username: user.username ?? "",
   }));
 

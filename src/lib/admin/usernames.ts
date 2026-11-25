@@ -86,6 +86,19 @@ type UsernameStore = {
   };
 };
 
+type EditableUsernameStore = {
+  user: {
+    findMany(args: {
+      where: { username: { in: string[] } };
+      select: { username: true };
+    }): Promise<{ username: string | null }[]>;
+    findUnique(args: {
+      select: { username: true };
+      where: { id: string };
+    }): Promise<{ username: string | null } | null>;
+  };
+};
+
 export const SUGGESTION_COUNT = 3;
 
 export const suggestUsernames = async (
@@ -103,6 +116,36 @@ export const suggestUsernames = async (
   const takenSet = new Set(
     taken.map((row) => (row.username ?? "").toLowerCase()),
   );
+  return candidates
+    .filter((candidate) => !takenSet.has(candidate))
+    .slice(0, SUGGESTION_COUNT);
+};
+
+export const suggestUsernamesForEdit = async (
+  name: string,
+  db: EditableUsernameStore,
+  selfId: string,
+): Promise<string[]> => {
+  const candidates = buildUsernameCandidates(name);
+  if (candidates.length === 0) {
+    return [];
+  }
+  const [taken, self] = await Promise.all([
+    db.user.findMany({
+      where: { username: { in: candidates } },
+      select: { username: true },
+    }),
+    db.user.findUnique({
+      where: { id: selfId },
+      select: { username: true },
+    }),
+  ]);
+  const takenSet = new Set(
+    taken.map((row) => (row.username ?? "").toLowerCase()),
+  );
+  if (self?.username) {
+    takenSet.delete(self.username.toLowerCase());
+  }
   return candidates
     .filter((candidate) => !takenSet.has(candidate))
     .slice(0, SUGGESTION_COUNT);

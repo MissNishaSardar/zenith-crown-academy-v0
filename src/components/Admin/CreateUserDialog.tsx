@@ -27,22 +27,21 @@ import {
 } from "@/components/shadcnui/dialog";
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "@/components/shadcnui/field";
 import { Input } from "@/components/shadcnui/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/shadcnui/native-select";
 import { withMinimumLoad } from "@/lib/auth/withMinimumLoad";
 import { generatePassword } from "@/lib/auth/passwordGenerator";
 import {
   buildCredentialFilename,
   buildCredentialText,
 } from "@/lib/admin/credentialHandout";
-import { roleLabels } from "@/lib/auth/permissions";
+import { parseRoleNames, roleLabels } from "@/lib/auth/permissions";
 import {
   assignableRoleNames,
   createUserSchema,
@@ -170,9 +169,9 @@ const CreateUserDialog = ({ onOpenChange, open }: CreateUserDialogProps) => {
   };
 
   const displayRole =
-    createdRole in roleLabels ?
-      roleLabels[createdRole as keyof typeof roleLabels]
-    : createdRole;
+    parseRoleNames(createdRole)
+      .map((role) => roleLabels[role])
+      .join(", ") || createdRole;
 
   const buildHandout = () => ({
     email: createdEmail,
@@ -249,7 +248,8 @@ const CreateUserDialog = ({ onOpenChange, open }: CreateUserDialogProps) => {
             <DialogHeader>
               <DialogTitle>Create user</DialogTitle>
               <DialogDescription>
-                Add an account. The password shows once after creation.
+                Pick roles. First checked is primary. The password shows once
+                after creation.
               </DialogDescription>
             </DialogHeader>
             <form
@@ -334,30 +334,66 @@ const CreateUserDialog = ({ onOpenChange, open }: CreateUserDialogProps) => {
                 <Controller
                   name="role"
                   control={control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor={field.name}>Role</FieldLabel>
-                      <NativeSelect
-                        id={field.name}
-                        name={field.name}
-                        value={field.value}
-                        onBlur={field.onBlur}
-                        onChange={(event) => {
-                          field.onChange(event.target.value);
-                        }}
-                        aria-invalid={fieldState.invalid}
-                        className="w-full">
-                        {assignableRoleNames.map((role) => (
-                          <NativeSelectOption
-                            key={role}
-                            value={role}>
-                            {roleLabels[role]}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                      <FieldError errors={[fieldState.error]} />
-                    </Field>
-                  )}
+                  render={({ field, fieldState }) => {
+                    type AssignableRole = (typeof assignableRoleNames)[number];
+                    const selected = (
+                      Array.isArray(field.value) ?
+                        field.value
+                      : [field.value]).filter((role): role is AssignableRole =>
+                      (assignableRoleNames as readonly string[]).includes(role),
+                    );
+                    const toggle = (
+                      roleName: AssignableRole,
+                      checked: boolean,
+                    ) => {
+                      if (checked) {
+                        if (!selected.includes(roleName)) {
+                          field.onChange([...selected, roleName]);
+                        }
+                        return;
+                      }
+                      if (selected.length <= 1) {
+                        return;
+                      }
+                      field.onChange(
+                        selected.filter((role) => role !== roleName),
+                      );
+                    };
+                    return (
+                      <FieldSet>
+                        <FieldLegend>Roles</FieldLegend>
+                        <FieldDescription>
+                          Allowed pairs: Parent with Teacher, Office staff,
+                          Librarian, Accountant. Teacher with Principal, Vice
+                          principal.
+                        </FieldDescription>
+                        <div className="flex flex-col gap-2">
+                          {assignableRoleNames.map((role) => (
+                            <Field
+                              key={role}
+                              orientation="horizontal"
+                              className="w-auto">
+                              <Checkbox
+                                id={`create-role-${role}`}
+                                checked={selected.includes(role)}
+                                onCheckedChange={(checked) =>
+                                  toggle(role, checked === true)
+                                }
+                                disabled={
+                                  selected.length === 1 &&
+                                  selected.includes(role)
+                                }
+                              />
+                              <FieldLabel htmlFor={`create-role-${role}`}>
+                                {roleLabels[role]}
+                              </FieldLabel>
+                            </Field>
+                          ))}
+                        </div>
+                        <FieldError errors={[fieldState.error]} />
+                      </FieldSet>
+                    );
+                  }}
                 />
                 <Controller
                   name="password"
