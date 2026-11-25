@@ -3,6 +3,11 @@
 import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
 
+import { Field, FieldLabel } from "@/components/shadcnui/field";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/shadcnui/native-select";
 import {
   parseRoleNames,
   roleLabels,
@@ -41,25 +46,28 @@ const RoleSwitcher = ({ storedRole }: RoleSwitcherProps) => {
   };
 
   return (
-    <label
-      htmlFor="role-switcher"
-      className="flex w-full items-center gap-2">
-      <span className="sr-only">Switch role</span>
-      <select
+    <Field
+      orientation="horizontal"
+      className="w-full">
+      <FieldLabel
+        htmlFor="role-switcher"
+        className="sr-only">
+        Switch role
+      </FieldLabel>
+      <NativeSelect
         id="role-switcher"
-        aria-label="Switch role"
         value={roleUrlSlug(activeRole)}
         onChange={(event) => onChange(event.target.value)}
-        className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full cursor-pointer rounded-md border px-2.5 text-sm font-medium outline-none focus-visible:ring-[3px]">
+        className="w-full cursor-pointer">
         {roles.map((role) => (
-          <option
+          <NativeSelectOption
             key={role}
             value={roleUrlSlug(role)}>
             {roleLabels[role]}
-          </option>
+          </NativeSelectOption>
         ))}
-      </select>
-    </label>
+      </NativeSelect>
+    </Field>
   );
 };
 

@@ -15,8 +15,8 @@ const AuthCard = ({ children, title, description }: AuthCardProps) => {
           <Image
             src="/logo-mark.png"
             alt="Zenith Crown Academy crown and graduation cap mark"
-            width={108}
-            height={64}
+            width={954}
+            height={561}
             priority
             className="h-16 w-auto drop-shadow-[0_12px_28px_oklch(0_0_0/0.45)]"
           />

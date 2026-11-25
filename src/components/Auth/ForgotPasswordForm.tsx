@@ -6,6 +6,8 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import { Button } from "@/components/shadcnui/button";
+import { Field, FieldError, FieldLabel } from "@/components/shadcnui/field";
+import { Input } from "@/components/shadcnui/input";
 import { authClient } from "@/lib/auth-client";
 import { withMinimumLoad } from "@/lib/auth/withMinimumLoad";
 import { forgotPasswordSchema, type forgotPasswordType } from "@/lib/zodSchema";
@@ -59,29 +61,18 @@ const ForgotPasswordForm = () => {
         name="email"
         control={control}
         render={({ field, fieldState }) => (
-          <div data-invalid={fieldState.invalid}>
-            <label
-              htmlFor={field.name}
-              className="mb-2 block text-[13.5px] font-semibold">
-              Email address
-            </label>
-            <input
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor={field.name}>Email address</FieldLabel>
+            <Input
               {...field}
               id={field.name}
               type="email"
               autoComplete="email"
               placeholder="you@school.edu"
               aria-invalid={fieldState.invalid}
-              className="border-input bg-background/60 placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 h-12 w-full rounded-xl border px-3.5 text-[15px] outline-none focus-visible:ring-[3px]"
             />
-            {fieldState.invalid && fieldState.error ?
-              <p
-                role="alert"
-                className="text-destructive mt-1.5 text-[13px]">
-                {fieldState.error.message}
-              </p>
-            : null}
-          </div>
+            <FieldError errors={[fieldState.error]} />
+          </Field>
         )}
       />
       {errors.root ?
@@ -105,8 +96,12 @@ const ForgotPasswordForm = () => {
           </>
         : "Send reset link"}
       </Button>
-      <p className="text-muted-foreground mt-4 text-[13px] leading-relaxed">
-        Reset email is stubbed until a real mail service is added.
+      <p className="mt-4 text-center text-sm">
+        <a
+          href="/login"
+          className="text-primary font-semibold underline-offset-4 hover:underline">
+          Back to sign in
+        </a>
       </p>
     </form>
   );
