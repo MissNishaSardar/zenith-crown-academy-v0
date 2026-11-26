@@ -87,7 +87,7 @@ const EditUserDialog = ({ onOpenChange, open, user }: EditUserDialogProps) => {
       void getUsernameSuggestionsForEdit(clean, userId).then((result) => {
         setSuggestions(result.suggestions);
       });
-    }, 400);
+    }, 500);
     return () => clearTimeout(timer);
   }, [nameValue, open, userId]);
 

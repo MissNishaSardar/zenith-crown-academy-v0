@@ -1,9 +1,12 @@
 import { cache } from "react";
 
 import prisma from "@/lib/dbClient/prisma";
+import {
+  FALLBACK_LOGO_PATH,
+  FALLBACK_SCHOOL_NAME,
+} from "@/lib/school-branding-constants";
 
-export const FALLBACK_SCHOOL_NAME = "Zenith Crown Academy";
-export const FALLBACK_LOGO_PATH = "/logo-mark.png";
+export { FALLBACK_LOGO_PATH, FALLBACK_SCHOOL_NAME };
 
 export type SchoolBranding = {
   academicYear: string;

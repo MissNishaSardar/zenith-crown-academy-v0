@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { dashboardRoute, type DashboardLink } from "@/lib/dashboard-nav";
-import { FALLBACK_SCHOOL_NAME } from "@/lib/school-branding";
+import { FALLBACK_SCHOOL_NAME } from "@/lib/school-branding-constants";
 import { cn } from "@/lib/utils";
 
 type DashboardSidebarProps = {

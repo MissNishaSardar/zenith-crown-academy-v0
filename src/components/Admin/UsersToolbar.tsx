@@ -81,7 +81,7 @@ const UsersToolbar = ({
       router.replace(
         `${pathname}${buildQuery({ banned, role, search: search.trim() })}` as Route,
       );
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
   }, [search, role, banned, urlSearch, pathname, router]);
 

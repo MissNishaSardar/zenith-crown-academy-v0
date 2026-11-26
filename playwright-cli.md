@@ -424,3 +424,28 @@ Running record of tooling notes, UI element names, routes, and flow gotchas disc
 - `src/lib/school-branding.ts`: `getSchoolBranding` is now read-only `findFirst` returning empty defaults when no row exists, so anonymous `/`, `/login`, header loads no longer upsert. `ensureSchoolSettings` stays for settings page plus actions.
 - `prisma/migrations/20261126090000_school_settings_singleton/migration.sql`: dedupes to the earliest row before creating the unique singleton index, so pre-existing duplicate rows cannot break the migration.
 - Verified: `bun run lint` passed with only the two pre-existing location assign warnings. Headed browser: `/` title reads live `Zenith Crown Academyyyyy`, mobile 390 header truncates with Sign in intact, `/login` still shows the uploaded `/uploads/school-logo-*.webp` mark, console 0 errors 0 warnings. Dev db holds exactly 1 settings row.
+
+## System health Both build (implemented 2026-11-26)
+
+- New `src/server/system/health.ts` with `getHealthSnapshot` (database timed `SELECT 1` plus user and session counts, storage writability on `public/uploads`, env presence booleans never values, runtime uptime plus memory plus node version) and `toPublicHealth` minimal projection. No audit writes for reads.
+- New `src/app/api/health/route.ts` public `GET`, `force-dynamic`, `no-store`, 200 when DB reachable else 503, shape `{status, timestamp, version, db: {reachable, latencyMs}}`.
+- New `src/app/(dashboard)/dashboard/administrator/system/page.tsx` Server Component gated on `system:view` plus `src/components/Admin/SystemHealthView.tsx` client cards with Refresh button (real disabled plus 1500ms minimum loader) reusing BreadcrumbTrail and PageHeader. Nav adds System health with Activity icon gated on `system:view` in `src/lib/dashboard-nav.ts`.
+- Verified: `bun run lint:check` passed (typegen plus tsc plus eslint, only the two pre-existing location assign warnings). Headed browser as seed admin: page renders Operational with DB 10 users 53 sessions, Refresh shows disabled Refreshing then re-enables, student bounces to `/dashboard/student`, anon to `/login`, API returns 200 no-store with no secret values, console 0 errors 0 warnings. Screenshots: `.playwright-cli/system-health-desktop.png`, `system-health-mobile.png`.
+
+## Dashboard Turbopack poison from sidebar branding import (fixed 2026-11-26, pre-existing on HEAD)
+
+- Every dashboard page 500d with Turbopack panic `does not support external modules (request: node:module)` in `get_app_client_references_chunks`, on clean tree with all new files removed, so not caused by the health feature. Landing plus `/api/health` stayed green.
+- Root cause: client `DashboardSidebar.tsx` imported `FALLBACK_SCHOOL_NAME` from `@/lib/school-branding`, which imports prisma, so the browser chunk graph pulled `@prisma/adapter-libsql` and `@libsql/client` (createRequire on `node:module`). Fix is a split: new client safe `src/lib/school-branding-constants.ts`, `school-branding.ts` re-exports both constants, sidebar imports from the constants file. No behavior change.
+- Verified after fix: sessions page compiles 200 again, `lint:check` clean.
+
+## Breadcrumb mobile truncation (fixed 2026-11-26, shell-wide pre-existing)
+
+- Every 3-crumb admin page overflowed at 390 widths (system 424 vs 375, sessions 389 vs 375) with the last crumb overlapping the avatar. Flex items need `min-w-0` to shrink: added it to the `nav` (flex item of the header row), the crumb `Link`, and the current page `span` in `src/components/Layout/Breadcrumbs.tsx`.
+- Verified: system plus sessions pages read 375/375 at 390 with crumbs ellipsizing, desktop breadcrumb unchanged, console 0 errors 0 warnings.
+
+## System health plain language UI (implemented 2026-11-26)
+
+- `src/components/Admin/SystemHealthView.tsx` rebuilt for non technical admins. Hero with status icon plus All working or Needs attention plus version pill plus plain headline plus working count plus local checked time with `suppressHydrationWarning` plus full width Refresh on mobile. Four cards with icons and What this means helpers: Classes and logins with Fast or Okay or Slow speed plus people records plus active logins, Files and uploads with Ready state plus folder, Setup and keys with Set or Missing badges and keys stay hidden note, Server awake time with human awake time plus memory plus node version. Semantic emerald plus destructive tokens, bg-card surfaces, aria labels plus aria live, Refresh keeps real disabled plus 1500ms loader via `withMinimumLoad`.
+- `src/app/(dashboard)/dashboard/administrator/system/page.tsx` subtitle changed to Simple status for learning data, files and setup. No server, API, nav, or shadcnui changes.
+- Hydration fix: locale date differs between server and client, so the checked line uses `suppressHydrationWarning`. Reload clears the mismatch plus the one time script tag error, leaving clean console.
+- Verified: `bun run lint` passed with only the two pre-existing location assign warnings, prettier check passed. Headed browser as seed admin: dark desktop and light desktop plus mobile 390 all render with no dead space, Refresh shows disabled Refreshing then re-enables, scrollWidth equals clientWidth on desktop 1440 and mobile 375, no double spaces, student1 bounces to `/dashboard/student`, anon to `/login`, API 200 no-store with no secret values, console 0 errors 0 warnings. Screenshots: viewport dark desktop, light desktop, mobile dark, mobile light in `.playwright-cli/`.

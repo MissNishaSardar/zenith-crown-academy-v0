@@ -49,7 +49,9 @@ const Breadcrumbs = () => {
   }
 
   return (
-    <nav aria-label="Breadcrumb">
+    <nav
+      aria-label="Breadcrumb"
+      className="min-w-0">
       <ol className="flex min-w-0 items-center gap-1 text-sm">
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
@@ -66,12 +68,12 @@ const Breadcrumbs = () => {
               {item.href && !isLast ?
                 <Link
                   href={item.href}
-                  className="text-muted-foreground hover:text-foreground truncate transition-colors">
+                  className="text-muted-foreground hover:text-foreground min-w-0 truncate transition-colors">
                   {item.label}
                 </Link>
               : <span
                   aria-current="page"
-                  className="text-foreground truncate font-medium">
+                  className="text-foreground min-w-0 truncate font-medium">
                   {item.label}
                 </span>
               }

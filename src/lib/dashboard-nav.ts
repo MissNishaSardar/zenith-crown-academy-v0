@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Activity,
   Backpack,
   BookOpen,
   Briefcase,
@@ -81,6 +82,12 @@ export const getDashboardLinks = (
       icon: KeyRound,
       label: "Sessions",
       requiredPermission: "system:manage",
+    },
+    {
+      href: "/dashboard/administrator/system",
+      icon: Activity,
+      label: "System health",
+      requiredPermission: "system:view",
     },
     {
       href: "/dashboard/administrator/settings",

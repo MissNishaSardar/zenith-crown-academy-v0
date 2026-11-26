@@ -101,7 +101,7 @@ const CreateUserDialog = ({ onOpenChange, open }: CreateUserDialogProps) => {
       void getUsernameSuggestions(clean).then((result) => {
         setSuggestions(result.suggestions);
       });
-    }, 400);
+    }, 500);
     return () => clearTimeout(timer);
   }, [createdPassword, nameValue]);
 
