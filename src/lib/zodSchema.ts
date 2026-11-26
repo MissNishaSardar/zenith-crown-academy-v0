@@ -251,6 +251,82 @@ export const revokeSessionSchema = z.object({
 
 export type revokeSessionType = z.infer<typeof revokeSessionSchema>;
 
+export const schoolSettingsSchema = z
+  .object({
+    academicYear: z
+      .string()
+      .trim()
+      .regex(/^\d{4}\/\d{4}$/, {
+        error: "Use format YYYY/YYYY like 2026/2027",
+      }),
+    address: z.string().trim().max(200, { error: "Address is too long" }),
+    email: z
+      .string()
+      .trim()
+      .transform((value) => value.toLowerCase())
+      .pipe(z.email({ error: "Enter a valid email address" })),
+    motto: z.string().trim().max(150, { error: "Motto is too long" }),
+    phone: z
+      .string()
+      .trim()
+      .transform((value) => {
+        const collapsed = value.replace(/\s+/g, " ").trim();
+        if (collapsed === "") {
+          return collapsed;
+        }
+        if (collapsed.startsWith("+")) {
+          return collapsed;
+        }
+        const digits = collapsed.replace(/\D/g, "");
+        if (/^[6-9]\d{9}$/.test(digits)) {
+          return `+91 ${digits}`;
+        }
+        if (/^91[6-9]\d{9}$/.test(digits)) {
+          return `+91 ${digits.slice(2)}`;
+        }
+        return collapsed;
+      })
+      .pipe(
+        z
+          .string()
+          .min(7, { error: "Enter a valid phone number" })
+          .max(20, { error: "Phone number is too long" })
+          .regex(/^\+\d[\d\s\-.()]*$/, {
+            error: "Use international format like +91 9876543210",
+          })
+          .refine(
+            (value) => {
+              const digits = value.replace(/\D/g, "");
+              return digits.length >= 7 && digits.length <= 15;
+            },
+            { error: "Enter a valid phone number" },
+          ),
+      ),
+    schoolName: z
+      .string()
+      .trim()
+      .min(1, { error: "Enter the school name" })
+      .max(100, { error: "School name is too long" }),
+  })
+  .superRefine((data, ctx) => {
+    const parts = data.academicYear.split("/");
+    const start = Number(parts[0]);
+    const end = Number(parts[1]);
+    if (
+      !Number.isInteger(start) ||
+      !Number.isInteger(end) ||
+      end !== start + 1
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Second year must be first year plus one",
+        path: ["academicYear"],
+      });
+    }
+  });
+
+export type schoolSettingsType = z.infer<typeof schoolSettingsSchema>;
+
 export const impersonateUserSchema = z.object({
   userId: z.string().min(1, { error: "Missing user id" }),
 });

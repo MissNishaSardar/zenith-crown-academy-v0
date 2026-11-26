@@ -102,3 +102,19 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_log")
 }
+
+model SchoolSettings {
+  id           String   @id @default(cuid())
+  singleton    String   @default("global") @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  schoolName   String   @default("")
+  motto        String   @default("")
+  address      String   @default("")
+  phone        String   @default("")
+  email        String   @default("")
+  academicYear String   @default("")
+  logoPath     String?
+
+  @@map("school_settings")
+}

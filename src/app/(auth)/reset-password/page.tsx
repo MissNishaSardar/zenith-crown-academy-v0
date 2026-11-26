@@ -3,6 +3,11 @@ import Link from "next/link";
 
 import AuthCard from "@/components/Auth/AuthCard";
 import ResetPasswordForm from "@/components/Auth/ResetPasswordForm";
+import {
+  displayLogoPath,
+  displaySchoolName,
+  getSchoolBranding,
+} from "@/lib/school-branding";
 
 export const metadata: Metadata = {
   title: "Reset password",
@@ -14,6 +19,9 @@ type ResetPasswordPageProps = {
 
 const ResetPasswordPage = async ({ searchParams }: ResetPasswordPageProps) => {
   const params = await searchParams;
+  const branding = await getSchoolBranding();
+  const logoSrc = displayLogoPath(branding);
+  const schoolName = displaySchoolName(branding);
   const tokenParam = params.token;
   const token =
     typeof tokenParam === "string" ? tokenParam
@@ -24,6 +32,8 @@ const ResetPasswordPage = async ({ searchParams }: ResetPasswordPageProps) => {
     return (
       <AuthCard
         title="Reset password"
+        logoSrc={logoSrc}
+        schoolName={schoolName}
         description="This link is missing or expired.">
         <p
           role="alert"
@@ -43,6 +53,8 @@ const ResetPasswordPage = async ({ searchParams }: ResetPasswordPageProps) => {
   return (
     <AuthCard
       title="Reset password"
+      logoSrc={logoSrc}
+      schoolName={schoolName}
       description="Choose a new password for your account. The old password stops working on the next sign in.">
       <ResetPasswordForm token={token} />
     </AuthCard>

@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Library,
   ScrollText,
+  Settings,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -80,6 +81,12 @@ export const getDashboardLinks = (
       icon: KeyRound,
       label: "Sessions",
       requiredPermission: "system:manage",
+    },
+    {
+      href: "/dashboard/administrator/settings",
+      icon: Settings,
+      label: "Settings",
+      requiredPermission: "system:view",
     },
   ];
   return allLinks.filter(

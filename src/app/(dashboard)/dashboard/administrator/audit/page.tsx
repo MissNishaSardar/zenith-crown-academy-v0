@@ -5,7 +5,11 @@ import PageHeader from "@/components/Layout/PageHeader";
 import AuditFilters from "@/components/Admin/AuditFilters";
 import AuditList from "@/components/Admin/AuditList";
 import prisma from "@/lib/dbClient/prisma";
-import { AUDIT_USER_ACTION_OPTIONS, diffAuditFields } from "@/server/audit";
+import {
+  AUDIT_SETTINGS_ACTION_OPTIONS,
+  AUDIT_USER_ACTION_OPTIONS,
+  diffAuditFields,
+} from "@/server/audit";
 import { requirePermission } from "@/server/guards";
 
 import type { Prisma } from "@generated/prisma/client";
@@ -15,6 +19,10 @@ export const metadata: Metadata = {
 };
 
 const PAGE_SIZE = 10;
+
+const AUDIT_ALL_ACTION_OPTIONS = [
+  ...new Set([...AUDIT_USER_ACTION_OPTIONS, ...AUDIT_SETTINGS_ACTION_OPTIONS]),
+];
 
 type AuditSearchParams = {
   action?: string | string[] | undefined;
@@ -34,11 +42,14 @@ const AuditPage = async ({ searchParams }: AuditPageProps) => {
   const raw = await searchParams;
 
   const entityParam = firstParam(raw.entity);
-  const entity = entityParam === "all" ? "all" : "user";
+  const entity =
+    entityParam === "all" || entityParam === "school_settings" ?
+      entityParam
+    : "user";
   const actionParam = firstParam(raw.action);
   const action =
     actionParam === "" || actionParam === "all" ? "all"
-    : (AUDIT_USER_ACTION_OPTIONS as readonly string[]).includes(actionParam) ?
+    : (AUDIT_ALL_ACTION_OPTIONS as readonly string[]).includes(actionParam) ?
       actionParam
     : "all";
   const parsedPage = Number.parseInt(firstParam(raw.page), 10);
@@ -108,11 +119,11 @@ const AuditPage = async ({ searchParams }: AuditPageProps) => {
         ]}
       />
       <PageHeader
-        subtitle="User administration trail"
+        subtitle="Administration trail"
         title="Audit log"
       />
       <AuditFilters
-        actionOptions={AUDIT_USER_ACTION_OPTIONS}
+        actionOptions={AUDIT_ALL_ACTION_OPTIONS}
         initialAction={action}
         initialEntity={entity}
       />

@@ -35,6 +35,8 @@ type DashboardShellProps = {
   userEmail: string;
   userImage: string | null | undefined;
   userName: string;
+  sidebarLogoSrc: string;
+  sidebarSchoolName: string;
   initialImpersonatedBy?: string | null | undefined;
   initialImpersonatedName?: string | null | undefined;
 };
@@ -118,6 +120,8 @@ const DashboardShell = ({
   userEmail,
   userImage,
   userName,
+  sidebarLogoSrc,
+  sidebarSchoolName,
   initialImpersonatedBy,
   initialImpersonatedName,
 }: DashboardShellProps) => {
@@ -168,6 +172,8 @@ const DashboardShell = ({
           collapsed={collapsed}
           links={links}
           mobileOpen={drawerOpen}
+          sidebarLogoSrc={sidebarLogoSrc}
+          sidebarSchoolName={sidebarSchoolName}
           onCloseMobile={onCloseMobile}
         />
         <div className="flex min-w-0 flex-1 flex-col">

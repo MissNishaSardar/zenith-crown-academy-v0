@@ -39,7 +39,13 @@ const AuditFilters = ({
 
   const rawEntity = searchParams.get("entity") ?? initialEntity;
   const entity =
-    rawEntity === "all" || rawEntity === "user" ? rawEntity : "user";
+    (
+      rawEntity === "all" ||
+      rawEntity === "user" ||
+      rawEntity === "school_settings"
+    ) ?
+      rawEntity
+    : "user";
   const rawAction = searchParams.get("action") ?? initialAction;
   const action =
     rawAction === "all" || actionOptions.includes(rawAction) ?
@@ -70,6 +76,9 @@ const AuditFilters = ({
           onChange={(event) => handleEntityChange(event.target.value)}
           className="w-full sm:w-44">
           <NativeSelectOption value="user">User</NativeSelectOption>
+          <NativeSelectOption value="school_settings">
+            School settings
+          </NativeSelectOption>
           <NativeSelectOption value="all">All</NativeSelectOption>
         </NativeSelect>
       </Field>

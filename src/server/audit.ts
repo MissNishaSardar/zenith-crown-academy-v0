@@ -221,7 +221,7 @@ export const diffAuditFields = (
   return diffs;
 };
 
-export const AUDIT_ENTITY_OPTIONS = ["user"] as const;
+export const AUDIT_ENTITY_OPTIONS = ["user", "school_settings"] as const;
 
 export const AUDIT_USER_ACTION_OPTIONS = [
   "ban",
@@ -234,3 +234,34 @@ export const AUDIT_USER_ACTION_OPTIONS = [
   "unban",
   "update",
 ] as const;
+
+export const AUDIT_SETTINGS_ACTION_OPTIONS = ["update", "upload-logo"] as const;
+
+export const SCHOOL_SETTINGS_AUDIT_FIELDS = [
+  "schoolName",
+  "motto",
+  "address",
+  "phone",
+  "email",
+  "academicYear",
+  "logoPath",
+] as const;
+
+export type SchoolSettingsAuditField =
+  (typeof SCHOOL_SETTINGS_AUDIT_FIELDS)[number];
+
+export const toSchoolSettingsAuditSnapshot = (
+  settings: unknown,
+): Record<string, unknown> => {
+  if (!isRecord(settings)) {
+    return {};
+  }
+  const out: Record<string, unknown> = {};
+  for (const field of SCHOOL_SETTINGS_AUDIT_FIELDS) {
+    if (field in settings) {
+      const value = settings[field];
+      out[field] = value instanceof Date ? value.toISOString() : value;
+    }
+  }
+  return out;
+};

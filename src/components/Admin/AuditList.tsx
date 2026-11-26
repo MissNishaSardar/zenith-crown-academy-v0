@@ -87,7 +87,7 @@ const AuditList = ({
   const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const hasFilter = entity !== "user" || action !== "all";
+  const hasFilter = (entity !== "user" && entity !== "all") || action !== "all";
   const prevHref = buildPageHref(
     { action, entity, page: Math.max(1, page - 1) },
     base,
@@ -181,7 +181,7 @@ const AuditList = ({
                 colSpan={6}>
                 {hasFilter ?
                   "No audit rows match these filters."
-                : "No audit rows yet. User actions will appear here."}
+                : "No audit rows yet. Actions will appear here."}
               </TableCell>
             </TableRow>
           }
