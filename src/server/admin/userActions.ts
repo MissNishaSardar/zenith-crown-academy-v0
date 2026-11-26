@@ -25,7 +25,11 @@ import {
   type unbanUserType,
   type updateUserType,
 } from "@/lib/zodSchema";
-import { logAudit, toUserAuditSnapshot } from "@/server/audit";
+import {
+  logAudit,
+  toMinimalAuditChange,
+  toUserAuditSnapshot,
+} from "@/server/audit";
 import { assertPermission } from "@/server/guards";
 
 export type CreateUserResult =
@@ -148,7 +152,7 @@ export const updateUser = async (
       action: "update",
       actor,
       after: { blocked: true, reason: "owner-blocked" },
-      before: toUserAuditSnapshot(target),
+      before: null,
       entity: "user",
       entityId: target.id,
     });
@@ -184,16 +188,20 @@ export const updateUser = async (
   }
 
   try {
-    const before = toUserAuditSnapshot(target);
+    const beforeFull = toUserAuditSnapshot(target);
     const row = await prisma.user.update({
       data: { email, emailVerified: true, name, username },
       where: { id },
     });
+    const minimalUpdate = toMinimalAuditChange(
+      beforeFull,
+      toUserAuditSnapshot(row),
+    );
     await logAudit({
       action: "update",
       actor,
-      after: toUserAuditSnapshot(row),
-      before,
+      after: minimalUpdate.after,
+      before: minimalUpdate.before,
       entity: "user",
       entityId: row.id,
     });
@@ -306,7 +314,7 @@ export const setRole = async (input: setRoleType): Promise<SetRoleResult> => {
       action: "set-role",
       actor,
       after: { blocked: true, reason: "owner-blocked" },
-      before: toUserAuditSnapshot(target),
+      before: null,
       entity: "user",
       entityId: target.id,
     });
@@ -320,7 +328,7 @@ export const setRole = async (input: setRoleType): Promise<SetRoleResult> => {
       action: "set-role",
       actor,
       after: { blocked: true, reason: "self-role-blocked" },
-      before: toUserAuditSnapshot(target),
+      before: null,
       entity: "user",
       entityId: target.id,
     });
@@ -334,7 +342,7 @@ export const setRole = async (input: setRoleType): Promise<SetRoleResult> => {
   }
 
   try {
-    const before = toUserAuditSnapshot(target);
+    const beforeFull = toUserAuditSnapshot(target);
     const requestHeaders = await headers();
     await auth.api.setRole({
       body: { role: roles, userId: id },
@@ -347,11 +355,15 @@ export const setRole = async (input: setRoleType): Promise<SetRoleResult> => {
     const row = await prisma.user.findUniqueOrThrow({
       where: { id },
     });
+    const minimalRole = toMinimalAuditChange(
+      beforeFull,
+      toUserAuditSnapshot(row),
+    );
     await logAudit({
       action: "set-role",
       actor,
-      after: toUserAuditSnapshot(row),
-      before,
+      after: minimalRole.after,
+      before: minimalRole.before,
       entity: "user",
       entityId: row.id,
     });
@@ -415,7 +427,7 @@ export const setPassword = async (
       action: "set-password",
       actor,
       after: { blocked: true, reason: "owner-blocked" },
-      before: toUserAuditSnapshot(target),
+      before: null,
       entity: "user",
       entityId: target.id,
     });
@@ -429,7 +441,7 @@ export const setPassword = async (
       action: "set-password",
       actor,
       after: { blocked: true, reason: "self-reset-blocked" },
-      before: toUserAuditSnapshot(target),
+      before: null,
       entity: "user",
       entityId: target.id,
     });
@@ -440,7 +452,7 @@ export const setPassword = async (
   }
 
   try {
-    const before = toUserAuditSnapshot(target);
+    const beforeFull = toUserAuditSnapshot(target);
     const requestHeaders = await headers();
     await auth.api.setUserPassword({
       body: { newPassword: password, userId: id },
@@ -453,11 +465,15 @@ export const setPassword = async (
     const row = await prisma.user.findUniqueOrThrow({
       where: { id },
     });
+    const minimalPassword = toMinimalAuditChange(
+      beforeFull,
+      toUserAuditSnapshot(row),
+    );
     await logAudit({
       action: "set-password",
       actor,
-      after: toUserAuditSnapshot(row),
-      before,
+      after: minimalPassword.after,
+      before: minimalPassword.before,
       entity: "user",
       entityId: row.id,
     });
@@ -535,7 +551,7 @@ export const banUser = async (input: banUserType): Promise<BanUserResult> => {
       action: "ban",
       actor,
       after: { blocked: true, reason: "owner-blocked" },
-      before: toUserAuditSnapshot(target),
+      before: null,
       entity: "user",
       entityId: target.id,
     });
@@ -549,7 +565,7 @@ export const banUser = async (input: banUserType): Promise<BanUserResult> => {
       action: "ban",
       actor,
       after: { blocked: true, reason: "self-ban-blocked" },
-      before: toUserAuditSnapshot(target),
+      before: null,
       entity: "user",
       entityId: target.id,
     });
@@ -580,7 +596,7 @@ export const banUser = async (input: banUserType): Promise<BanUserResult> => {
   }
 
   try {
-    const before = toUserAuditSnapshot(target);
+    const beforeFull = toUserAuditSnapshot(target);
     const requestHeaders = await headers();
     await auth.api.banUser({
       body: {
@@ -596,11 +612,15 @@ export const banUser = async (input: banUserType): Promise<BanUserResult> => {
     const row = await prisma.user.findUniqueOrThrow({
       where: { id },
     });
+    const minimalBan = toMinimalAuditChange(
+      beforeFull,
+      toUserAuditSnapshot(row),
+    );
     await logAudit({
       action: "ban",
       actor,
-      after: toUserAuditSnapshot(row),
-      before,
+      after: minimalBan.after,
+      before: minimalBan.before,
       entity: "user",
       entityId: row.id,
     });
@@ -664,7 +684,7 @@ export const unbanUser = async (
       action: "unban",
       actor,
       after: { blocked: true, reason: "owner-blocked" },
-      before: toUserAuditSnapshot(target),
+      before: null,
       entity: "user",
       entityId: target.id,
     });
@@ -678,7 +698,7 @@ export const unbanUser = async (
       action: "unban",
       actor,
       after: { blocked: true, reason: "self-unban-blocked" },
-      before: toUserAuditSnapshot(target),
+      before: null,
       entity: "user",
       entityId: target.id,
     });
@@ -689,7 +709,7 @@ export const unbanUser = async (
   }
 
   try {
-    const before = toUserAuditSnapshot(target);
+    const beforeFull = toUserAuditSnapshot(target);
     const requestHeaders = await headers();
     await auth.api.unbanUser({
       body: { userId: id },
@@ -698,11 +718,15 @@ export const unbanUser = async (
     const row = await prisma.user.findUniqueOrThrow({
       where: { id },
     });
+    const minimalUnban = toMinimalAuditChange(
+      beforeFull,
+      toUserAuditSnapshot(row),
+    );
     await logAudit({
       action: "unban",
       actor,
-      after: toUserAuditSnapshot(row),
-      before,
+      after: minimalUnban.after,
+      before: minimalUnban.before,
       entity: "user",
       entityId: row.id,
     });

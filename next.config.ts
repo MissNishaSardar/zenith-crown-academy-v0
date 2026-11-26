@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
   typedRoutes: true,
   experimental: {
     agentUpgrade: "security",
+    authInterrupts: true,
   },
 };
 

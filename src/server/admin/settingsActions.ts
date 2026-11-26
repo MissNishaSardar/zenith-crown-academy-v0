@@ -8,7 +8,11 @@ import { revalidatePath } from "next/cache";
 import prisma from "@/lib/dbClient/prisma";
 import { ensureSchoolSettings } from "@/lib/school-branding";
 import { schoolSettingsSchema, type schoolSettingsType } from "@/lib/zodSchema";
-import { logAudit, toSchoolSettingsAuditSnapshot } from "@/server/audit";
+import {
+  logAudit,
+  toMinimalAuditChange,
+  toSchoolSettingsAuditSnapshot,
+} from "@/server/audit";
 import { assertPermission } from "@/server/guards";
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
@@ -74,18 +78,22 @@ export const updateSchoolSettings = async (
   }
 
   const current = await ensureSchoolSettings();
-  const before = toSchoolSettingsAuditSnapshot(current);
+  const beforeFull = toSchoolSettingsAuditSnapshot(current);
 
   const row = await prisma.schoolSettings.update({
     data: { ...parsed.data },
     where: { id: current.id },
   });
 
+  const minimalSettings = toMinimalAuditChange(
+    beforeFull,
+    toSchoolSettingsAuditSnapshot(row),
+  );
   await logAudit({
     action: "update",
     actor,
-    after: toSchoolSettingsAuditSnapshot(row),
-    before,
+    after: minimalSettings.after,
+    before: minimalSettings.before,
     entity: "school_settings",
     entityId: row.id,
   });
@@ -125,7 +133,7 @@ export const uploadSchoolLogo = async (
   }
 
   const current = await ensureSchoolSettings();
-  const before = toSchoolSettingsAuditSnapshot(current);
+  const beforeFull = toSchoolSettingsAuditSnapshot(current);
 
   let buffer: Buffer;
   try {
@@ -169,11 +177,15 @@ export const uploadSchoolLogo = async (
     }
   }
 
+  const minimalLogo = toMinimalAuditChange(
+    beforeFull,
+    toSchoolSettingsAuditSnapshot(row),
+  );
   await logAudit({
     action: "upload-logo",
     actor,
-    after: toSchoolSettingsAuditSnapshot(row),
-    before,
+    after: minimalLogo.after,
+    before: minimalLogo.before,
     entity: "school_settings",
     entityId: row.id,
   });

@@ -6,12 +6,12 @@ import { auth } from "@/lib/auth";
 import { can, parseRoleNames } from "@/lib/auth/permissions";
 import prisma from "@/lib/dbClient/prisma";
 import {
-  impersonateUserSchema,
+  revokeAllUserSessionsSchema,
   revokeSessionSchema,
-  type impersonateUserType,
+  type revokeAllUserSessionsType,
   type revokeSessionType,
 } from "@/lib/zodSchema";
-import { logAudit, toUserAuditSnapshot } from "@/server/audit";
+import { logAudit } from "@/server/audit";
 import { assertPermission } from "@/server/guards";
 
 export type RevokeSessionResult =
@@ -23,6 +23,111 @@ export type RevokeSessionResult =
       errors: Partial<Record<"root", string>>;
       ok: false;
     };
+
+export type RevokeAllUserSessionsResult =
+  | {
+      ok: true;
+      revokedCount: number;
+    }
+  | {
+      errors: Partial<Record<"root", string>>;
+      ok: false;
+    };
+
+export const revokeAllUserSessions = async (
+  input: revokeAllUserSessionsType,
+): Promise<RevokeAllUserSessionsResult> => {
+  const session = await assertPermission("system:manage");
+  const actor = {
+    email: session.user.email,
+    id: session.user.id,
+    role: session.user.role,
+  };
+
+  const parsed = revokeAllUserSessionsSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      errors: { root: "Check the highlighted fields and try again." },
+      ok: false,
+    };
+  }
+  const { userId } = parsed.data;
+
+  const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (!targetUser) {
+    return {
+      errors: { root: "This user no longer exists." },
+      ok: false,
+    };
+  }
+  if (parseRoleNames(targetUser.role).includes("owner")) {
+    await logAudit({
+      action: "revoke",
+      actor,
+      after: { blocked: true, reason: "owner-blocked" },
+      before: null,
+      entity: "user",
+      entityId: targetUser.id,
+    });
+    return {
+      errors: { root: "Owner accounts cannot be changed here." },
+      ok: false,
+    };
+  }
+
+  const requestHeaders = await headers();
+  const current = await auth.api.getSession({ headers: requestHeaders });
+  const currentSessionId = current?.session.id ?? null;
+
+  const activeSessions = await prisma.session.findMany({
+    orderBy: { createdAt: "asc" },
+    select: { id: true, token: true },
+    where: { expiresAt: { gt: new Date() }, userId },
+  });
+  const revokable = activeSessions.filter((row) => row.id !== currentSessionId);
+  if (revokable.length === 0) {
+    return {
+      errors: {
+        root:
+          targetUser.id === session.user.id ?
+            "Only your current session is active. Sign out instead to end it."
+          : "This user has no other active sessions.",
+      },
+      ok: false,
+    };
+  }
+
+  let revokedCount = 0;
+  for (const row of revokable) {
+    try {
+      await auth.api.revokeUserSession({
+        body: { sessionToken: row.token },
+        headers: requestHeaders,
+      });
+      await logAudit({
+        action: "revoke",
+        actor,
+        after: {
+          reason: "session-revoke-all",
+          sessionId: row.id,
+          userId,
+        },
+        before: null,
+        entity: "user",
+        entityId: userId,
+      });
+      revokedCount += 1;
+    } catch {
+      return {
+        errors: {
+          root: `Revoked ${revokedCount} of ${revokable.length} sessions before an error stopped the rest. Try again for the remainder.`,
+        },
+        ok: false,
+      };
+    }
+  }
+  return { ok: true, revokedCount };
+};
 
 export const revokeSession = async (
   input: revokeSessionType,
@@ -58,7 +163,7 @@ export const revokeSession = async (
       action: "revoke",
       actor,
       after: { blocked: true, reason: "owner-blocked" },
-      before: toUserAuditSnapshot(target.user),
+      before: null,
       entity: "user",
       entityId: target.userId,
     });
@@ -81,7 +186,7 @@ export const revokeSession = async (
       action: "revoke",
       actor,
       after: { blocked: true, reason: "self-current-session-blocked" },
-      before: toUserAuditSnapshot(target.user),
+      before: null,
       entity: "user",
       entityId: target.userId,
     });
@@ -219,110 +324,6 @@ const isEffectivelyBanned = (
   banExpires: Date | null,
 ): boolean => banned && (banExpires === null || banExpires > new Date());
 
-export type StartImpersonationResult =
-  | {
-      ok: true;
-      user: { id: string };
-    }
-  | {
-      errors: Partial<Record<"root", string>>;
-      ok: false;
-    };
-
-export const startImpersonation = async (
-  input: impersonateUserType,
-): Promise<StartImpersonationResult> => {
-  const adminSession = await assertPermission("system:manage");
-  const actor = {
-    email: adminSession.user.email,
-    id: adminSession.user.id,
-    role: adminSession.user.role,
-  };
-
-  const parsed = impersonateUserSchema.safeParse(input);
-  if (!parsed.success) {
-    return {
-      errors: { root: "Check the highlighted fields and try again." },
-      ok: false,
-    };
-  }
-  const { userId } = parsed.data;
-
-  const target = await prisma.user.findUnique({
-    where: { id: userId },
-  });
-  if (!target) {
-    return {
-      errors: { root: "This user no longer exists." },
-      ok: false,
-    };
-  }
-
-  const block = async (
-    reason: string,
-    message: string,
-  ): Promise<StartImpersonationResult> => {
-    await logAudit({
-      action: "impersonate",
-      actor,
-      after: { blocked: true, reason },
-      before: toUserAuditSnapshot(target),
-      entity: "user",
-      entityId: target.id,
-    });
-    return {
-      errors: { root: message },
-      ok: false,
-    };
-  };
-
-  if (parseRoleNames(target.role).includes("owner")) {
-    return block("owner-blocked", "Owner accounts cannot be changed here.");
-  }
-  if (actor.id === target.id) {
-    return block(
-      "self-impersonate-blocked",
-      "You cannot impersonate yourself.",
-    );
-  }
-  if (parseRoleNames(target.role).includes("administrator")) {
-    return block(
-      "admin-target-blocked",
-      "Administrators cannot be impersonated here.",
-    );
-  }
-  if (isEffectivelyBanned(target.banned, target.banExpires)) {
-    return block(
-      "banned-target-blocked",
-      "Banned accounts cannot be impersonated.",
-    );
-  }
-
-  try {
-    const requestHeaders = await headers();
-    const { headers: responseHeaders } = await auth.api.impersonateUser({
-      body: { userId: target.id },
-      headers: requestHeaders,
-      returnHeaders: true,
-    });
-    await forwardSetCookies(readSetCookies(responseHeaders));
-    await logAudit({
-      action: "impersonate",
-      actor,
-      after: { reason: "impersonation-start", userId: target.id },
-      before: null,
-      entity: "user",
-      entityId: target.id,
-    });
-    return { ok: true, user: { id: target.id } };
-  } catch {
-    return {
-      errors: { root: "Could not start impersonation. Try again." },
-      ok: false,
-    };
-  }
-};
-
 export type StopImpersonationResult =
   | {
       ok: true;
@@ -332,6 +333,10 @@ export type StopImpersonationResult =
       ok: false;
     };
 
+// Stop-only escape hatch for sessions that were impersonated before
+// impersonation was removed. There is intentionally no start action here,
+// and no impersonate permission in the access statement, so Better Auth
+// denies any new impersonate-user call while legacy sessions can still exit.
 export const stopImpersonation = async (): Promise<StopImpersonationResult> => {
   const requestHeaders = await headers();
   const current = await auth.api.getSession({ headers: requestHeaders });

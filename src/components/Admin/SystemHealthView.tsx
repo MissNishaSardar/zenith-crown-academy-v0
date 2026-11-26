@@ -5,6 +5,7 @@ import {
   CircleCheckIcon,
   DatabaseIcon,
   HardDriveIcon,
+  InfoIcon,
   Loader2Icon,
   RefreshCwIcon,
   ShieldCheckIcon,
@@ -12,10 +13,20 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/shadcnui/badge";
 import { Button } from "@/components/shadcnui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/shadcnui/dialog";
 import { withMinimumLoad } from "@/lib/auth/withMinimumLoad";
+import { formatDateTimeDisplay } from "@/lib/formatDate";
 import type { HealthSnapshot } from "@/server/system/health";
 
 type SystemHealthViewProps = {
@@ -42,11 +53,11 @@ const formatCount = (value: number | null): string => {
   return `${value}`;
 };
 
-const formatMemory = (value: number | null): string => {
-  if (value === null) {
+const formatMemory = (used: number | null, total: number | null): string => {
+  if (used === null || total === null) {
     return "Not measured yet";
   }
-  return `${value} MB in use`;
+  return `${used} MB of ${total} MB`;
 };
 
 const formatUptime = (totalSeconds: number): string => {
@@ -69,12 +80,102 @@ const formatUptime = (totalSeconds: number): string => {
   return restHours > 0 ? `${days} days ${restHours} hours` : `${days} days`;
 };
 
-const formatCheckedAt = (iso: string): string => {
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) {
-    return iso;
+const formatCheckedAt = (iso: string): string => formatDateTimeDisplay(iso);
+
+type MemoryState = {
+  badge: ReactNode;
+  barClass: string;
+  percent: number | null;
+};
+
+const getMemoryState = (
+  used: number | null,
+  total: number | null,
+  ok: boolean,
+): MemoryState => {
+  if (!ok) {
+    return {
+      badge: <Badge variant="destructive">Not measured</Badge>,
+      barClass: "bg-destructive",
+      percent: null,
+    };
   }
-  return parsed.toLocaleString();
+  if (used === null || total === null || total <= 0) {
+    return {
+      badge: <Badge variant="destructive">Not measured</Badge>,
+      barClass: "bg-destructive",
+      percent: null,
+    };
+  }
+  const percent = Math.min(100, Math.round((used / total) * 100));
+  if (percent >= 90) {
+    return {
+      badge: <Badge variant="destructive">Critical</Badge>,
+      barClass: "bg-destructive",
+      percent,
+    };
+  }
+  if (percent >= 70) {
+    return {
+      badge: (
+        <Badge className="border-transparent bg-amber-500/15 text-amber-800 dark:text-amber-300">
+          High
+        </Badge>
+      ),
+      barClass: "bg-amber-500",
+      percent,
+    };
+  }
+  return {
+    badge: (
+      <Badge className="border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+        Normal
+      </Badge>
+    ),
+    barClass: "bg-emerald-500",
+    percent,
+  };
+};
+
+type HealthDetailsDialogProps = {
+  meaning: string;
+  subtitle: string;
+  title: string;
+};
+
+const HealthDetailsDialog = ({
+  meaning,
+  subtitle,
+  title,
+}: HealthDetailsDialogProps) => {
+  return (
+    <Dialog>
+      <DialogTrigger
+        render={
+          <Button
+            className="w-full justify-start"
+            size="sm"
+            type="button"
+            variant="outline"
+          />
+        }>
+        <InfoIcon
+          aria-hidden="true"
+          data-icon="inline-start"
+        />
+        View details
+      </DialogTrigger>
+      <DialogContent className="max-h-[calc(100%-2rem)] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{subtitle}</DialogDescription>
+        </DialogHeader>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          {meaning}
+        </p>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
@@ -100,6 +201,11 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
   const workingCount = checks.filter(Boolean).length;
   const isOk = snapshot.status === "ok";
   const checkedDisplay = formatCheckedAt(snapshot.timestamp);
+  const memory = getMemoryState(
+    snapshot.runtime.memoryMb,
+    snapshot.runtime.memoryTotalMb,
+    snapshot.runtime.ok,
+  );
 
   const StatusHeroIcon = isOk ? CircleCheckIcon : TriangleAlertIcon;
 
@@ -141,7 +247,7 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
                 }
               </p>
               <p
-                className="text-muted-foreground text-xs"
+                className="text-muted-foreground text-[13px] leading-relaxed"
                 suppressHydrationWarning>
                 Checked {checkedDisplay}. Times use your device clock.
               </p>
@@ -174,7 +280,7 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <section
           aria-label="Classes and logins"
-          className="bg-card flex flex-col gap-3 rounded-xl border p-4">
+          className="bg-card flex h-60 flex-col gap-3 rounded-xl border p-4">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
               <span
@@ -193,7 +299,7 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
               <Badge>Working</Badge>
             : <Badge variant="destructive">Needs attention</Badge>}
           </div>
-          <dl className="flex flex-col gap-1 text-sm">
+          <dl className="flex flex-1 flex-col gap-1 text-sm">
             <div className="flex items-center justify-between gap-2">
               <dt className="text-muted-foreground">Speed</dt>
               <dd className="text-foreground font-medium">
@@ -213,20 +319,18 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
               </dd>
             </div>
           </dl>
-          <div className="bg-muted/60 rounded-lg p-2.5">
-            <p className="text-xs font-medium">What this means</p>
-            <p className="text-muted-foreground text-xs">
-              When this is working, everyone can sign in and open class pages.
-            </p>
+          <div className="mt-auto pt-1">
+            <HealthDetailsDialog
+              title="Classes and logins"
+              subtitle="Student records and sign in"
+              meaning="When this is working, everyone can sign in and open class pages."
+            />
           </div>
-          <p className="text-muted-foreground text-xs">
-            {snapshot.database.message}
-          </p>
         </section>
 
         <section
           aria-label="Files and uploads"
-          className="bg-card flex flex-col gap-3 rounded-xl border p-4">
+          className="bg-card flex h-60 flex-col gap-3 rounded-xl border p-4">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
               <span
@@ -245,7 +349,7 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
               <Badge>Ready</Badge>
             : <Badge variant="destructive">Not ready</Badge>}
           </div>
-          <dl className="flex flex-col gap-1 text-sm">
+          <dl className="flex flex-1 flex-col gap-1 text-sm">
             <div className="flex items-center justify-between gap-2">
               <dt className="text-muted-foreground">Upload space</dt>
               <dd className="text-foreground font-medium">
@@ -259,20 +363,18 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
               <dd className="text-foreground font-medium">Public uploads</dd>
             </div>
           </dl>
-          <div className="bg-muted/60 rounded-lg p-2.5">
-            <p className="text-xs font-medium">What this means</p>
-            <p className="text-muted-foreground text-xs">
-              When this is ready, file uploads will save without errors.
-            </p>
+          <div className="mt-auto pt-1">
+            <HealthDetailsDialog
+              title="Files and uploads"
+              subtitle="Worksheets and images"
+              meaning="When this is ready, file uploads will save without errors."
+            />
           </div>
-          <p className="text-muted-foreground text-xs">
-            {snapshot.storage.message}
-          </p>
         </section>
 
         <section
           aria-label="Setup and keys"
-          className="bg-card flex flex-col gap-3 rounded-xl border p-4">
+          className="bg-card flex h-60 flex-col gap-3 rounded-xl border p-4">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
               <span
@@ -291,7 +393,7 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
               <Badge>Complete</Badge>
             : <Badge variant="destructive">Missing keys</Badge>}
           </div>
-          <dl className="flex flex-col gap-1 text-sm">
+          <dl className="flex flex-1 flex-col gap-1 text-sm">
             <div className="flex items-center justify-between gap-2">
               <dt className="text-muted-foreground">Main database</dt>
               <dd>
@@ -317,20 +419,18 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
               </dd>
             </div>
           </dl>
-          <div className="bg-muted/60 rounded-lg p-2.5">
-            <p className="text-xs font-medium">What this means</p>
-            <p className="text-muted-foreground text-xs">
-              Keys stay hidden. This page only shows if each key is present.
-            </p>
+          <div className="mt-auto pt-1">
+            <HealthDetailsDialog
+              title="Setup and keys"
+              subtitle="Private app settings"
+              meaning="Keys stay hidden. This page only shows if each key is present."
+            />
           </div>
-          <p className="text-muted-foreground text-xs">
-            {snapshot.env.message}
-          </p>
         </section>
 
         <section
           aria-label="Server awake time"
-          className="bg-card flex flex-col gap-3 rounded-xl border p-4">
+          className="bg-card flex h-60 flex-col gap-3 rounded-xl border p-4">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
               <span
@@ -345,11 +445,9 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
                 </p>
               </div>
             </div>
-            {snapshot.runtime.ok ?
-              <Badge variant="outline">Measured</Badge>
-            : <Badge variant="destructive">Not measured</Badge>}
+            {memory.badge}
           </div>
-          <dl className="flex flex-col gap-1 text-sm">
+          <dl className="flex flex-1 flex-col gap-1 text-sm">
             <div className="flex items-center justify-between gap-2">
               <dt className="text-muted-foreground">Awake for</dt>
               <dd className="text-foreground font-medium">
@@ -359,26 +457,40 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
             <div className="flex items-center justify-between gap-2">
               <dt className="text-muted-foreground">Memory</dt>
               <dd className="text-foreground font-medium">
-                {formatMemory(snapshot.runtime.memoryMb)}
+                {formatMemory(
+                  snapshot.runtime.memoryMb,
+                  snapshot.runtime.memoryTotalMb,
+                )}
               </dd>
             </div>
             <div className="flex items-center justify-between gap-2">
-              <dt className="text-muted-foreground">Server software</dt>
+              <dt className="text-muted-foreground">Status</dt>
               <dd className="text-foreground font-medium">
-                {snapshot.runtime.nodeVersion}
+                {snapshot.runtime.ok ? "Running normally" : "Not available"}
               </dd>
             </div>
           </dl>
-          <div className="bg-muted/60 rounded-lg p-2.5">
-            <p className="text-xs font-medium">What this means</p>
-            <p className="text-muted-foreground text-xs">
-              A short awake time after an update is normal. Memory changes
-              through the day.
-            </p>
+          {memory.percent !== null ?
+            <div
+              aria-label={`Memory use ${memory.percent} percent`}
+              className="bg-muted h-1.5 w-full overflow-hidden rounded-full"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={memory.percent}>
+              <div
+                className={`h-full rounded-full ${memory.barClass}`}
+                style={{ width: `${memory.percent}%` }}
+              />
+            </div>
+          : null}
+          <div className="mt-auto pt-1">
+            <HealthDetailsDialog
+              title="Server awake time"
+              subtitle="Memory and run time"
+              meaning="A short awake time after an update is normal. Memory changes through the day."
+            />
           </div>
-          <p className="text-muted-foreground text-xs">
-            {snapshot.runtime.message}
-          </p>
         </section>
       </div>
     </div>

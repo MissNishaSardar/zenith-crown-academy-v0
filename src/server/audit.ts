@@ -201,6 +201,25 @@ export const diffAuditFields = (
 ): AuditFieldDiff[] => {
   const beforeRecord = isRecord(before) ? before : {};
   const afterRecord = isRecord(after) ? after : {};
+  // Blocked or denied attempts carry status markers, not field edits. Old
+  // rows stored a full snapshot beside {blocked, reason}, which unions to
+  // the whole user. Show only the marker so the reviewer sees why it
+  // stopped without opening Details.
+  if (beforeRecord["blocked"] === true || afterRecord["blocked"] === true) {
+    const markerFields = ["blocked", "reason"];
+    const diffs: AuditFieldDiff[] = [];
+    for (const field of markerFields) {
+      const beforeValue = beforeRecord[field] ?? null;
+      const afterValue = afterRecord[field] ?? null;
+      if (
+        normalizeForCompare(beforeValue) !== normalizeForCompare(afterValue)
+      ) {
+        diffs.push({ after: afterValue, before: beforeValue, field });
+      }
+    }
+    diffs.sort((a, b) => a.field.localeCompare(b.field));
+    return diffs;
+  }
   const fields = new Set([
     ...Object.keys(beforeRecord),
     ...Object.keys(afterRecord),
@@ -219,6 +238,22 @@ export const diffAuditFields = (
   }
   diffs.sort((a, b) => a.field.localeCompare(b.field));
   return diffs;
+};
+
+export const toMinimalAuditChange = (
+  before: unknown,
+  after: unknown,
+): { after: Record<string, unknown>; before: Record<string, unknown> } => {
+  const diffs = diffAuditFields(before, after);
+  const beforeRecord = isRecord(before) ? before : {};
+  const afterRecord = isRecord(after) ? after : {};
+  const nextBefore: Record<string, unknown> = {};
+  const nextAfter: Record<string, unknown> = {};
+  for (const diff of diffs) {
+    nextBefore[diff.field] = beforeRecord[diff.field] ?? null;
+    nextAfter[diff.field] = afterRecord[diff.field] ?? null;
+  }
+  return { after: nextAfter, before: nextBefore };
 };
 
 export const AUDIT_ENTITY_OPTIONS = ["user", "school_settings"] as const;

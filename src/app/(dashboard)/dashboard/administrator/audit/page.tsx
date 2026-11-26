@@ -5,6 +5,7 @@ import PageHeader from "@/components/Layout/PageHeader";
 import AuditFilters from "@/components/Admin/AuditFilters";
 import AuditList from "@/components/Admin/AuditList";
 import prisma from "@/lib/dbClient/prisma";
+import { formatDateTimeDisplay } from "@/lib/formatDate";
 import {
   AUDIT_SETTINGS_ACTION_OPTIONS,
   AUDIT_USER_ACTION_OPTIONS,
@@ -93,13 +94,7 @@ const AuditPage = async ({ searchParams }: AuditPageProps) => {
     actorEmail: entry.actorEmail,
     actorRole: entry.actorRole,
     createdAt: entry.createdAt.toISOString(),
-    createdAtDisplay: entry.createdAt.toLocaleString("en-US", {
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      month: "short",
-      year: "numeric",
-    }),
+    createdAtDisplay: formatDateTimeDisplay(entry.createdAt),
     diffs: diffAuditFields(entry.before, entry.after),
     entity: entry.entity,
     entityId: entry.entityId,
@@ -113,7 +108,7 @@ const AuditPage = async ({ searchParams }: AuditPageProps) => {
           { href: "/dashboard", label: "Dashboard" },
           {
             href: "/dashboard/administrator",
-            label: "Administrator workspace",
+            label: "Overview",
           },
           { label: "Audit log" },
         ]}

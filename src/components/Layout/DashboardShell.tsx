@@ -41,7 +41,7 @@ type DashboardShellProps = {
   initialImpersonatedName?: string | null | undefined;
 };
 
-const ImpersonationBanner = ({
+const LegacyImpersonationBanner = ({
   initialImpersonatedBy,
   initialImpersonatedName,
 }: {
@@ -56,9 +56,9 @@ const ImpersonationBanner = ({
     data?.session as unknown as
       { impersonatedBy?: string | null | undefined } | undefined
   )?.impersonatedBy;
-  // Show the banner when either the server layout or the client session
-  // reports impersonation, so a stale or reshaped client session can never
-  // silently hide the indicator.
+  // Stop-only banner for sessions impersonated before removal. Server and
+  // client values are merged so a stale client session can never hide it.
+  // There is no start UI. New impersonation is denied by permissions.
   const impersonatedBy = clientImpersonatedBy ?? initialImpersonatedBy ?? null;
   const impersonatedName =
     data?.user?.name ?? initialImpersonatedName ?? "user";
@@ -86,7 +86,10 @@ const ImpersonationBanner = ({
     <div
       role="status"
       className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm">
-      <span>You are impersonating {impersonatedName}.</span>
+      <span>
+        You are viewing as {impersonatedName}. Impersonation is disabled for new
+        sessions.
+      </span>
       {error ?
         <span
           role="alert"
@@ -108,7 +111,7 @@ const ImpersonationBanner = ({
             />
             Stopping
           </>
-        : "Stop impersonating"}
+        : "Stop viewing"}
       </Button>
     </div>
   );
@@ -163,7 +166,7 @@ const DashboardShell = ({
 
   return (
     <BreadcrumbProvider>
-      <ImpersonationBanner
+      <LegacyImpersonationBanner
         initialImpersonatedBy={initialImpersonatedBy}
         initialImpersonatedName={initialImpersonatedName ?? userName}
       />

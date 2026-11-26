@@ -9,11 +9,48 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/shadcnui/native-select";
+import {
+  getAuditActionLabel,
+  getAuditTitle,
+} from "@/lib/admin/auditPresentation";
 
 type AuditFiltersProps = {
   actionOptions: readonly string[];
   initialAction: string;
   initialEntity: string;
+};
+
+const SETTINGS_ONLY_ACTIONS = new Set(["upload-logo"]);
+
+const USER_ONLY_ACTIONS = new Set([
+  "ban",
+  "create",
+  "impersonate",
+  "revoke",
+  "set-password",
+  "set-role",
+  "stop-impersonating",
+  "unban",
+]);
+
+const getVisibleOptions = (
+  options: readonly string[],
+  entity: string,
+): readonly string[] => {
+  if (entity === "school_settings") {
+    return options.filter((option) => !USER_ONLY_ACTIONS.has(option));
+  }
+  if (entity === "user") {
+    return options.filter((option) => !SETTINGS_ONLY_ACTIONS.has(option));
+  }
+  return options;
+};
+
+const getActionLabel = (option: string, entity: string): string => {
+  if (entity === "user" || entity === "school_settings") {
+    return getAuditTitle(entity, option);
+  }
+  return getAuditActionLabel(option);
 };
 
 const buildQuery = (values: { action: string; entity: string }): string => {
@@ -90,11 +127,11 @@ const AuditFilters = ({
           onChange={(event) => handleActionChange(event.target.value)}
           className="w-full sm:w-44">
           <NativeSelectOption value="all">All actions</NativeSelectOption>
-          {actionOptions.map((option) => (
+          {getVisibleOptions(actionOptions, entity).map((option) => (
             <NativeSelectOption
               key={option}
               value={option}>
-              {option}
+              {getActionLabel(option, entity)}
             </NativeSelectOption>
           ))}
         </NativeSelect>

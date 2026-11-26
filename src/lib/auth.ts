@@ -9,9 +9,21 @@ import { serverEnv } from "./env/serverEnv";
 
 export const auth = betterAuth({
   baseURL: serverEnv.BETTER_AUTH_URL,
+  advanced: {
+    ipAddress: {
+      // Prefer the proxy header when present, fall back to the standard
+      // header for direct connections. Order matters: a client can spoof
+      // later entries, so the proxy-controlled header stays first.
+      ipAddressHeaders: ["x-real-ip", "x-forwarded-for"],
+    },
+  },
   database: prismaAdapter(prisma, {
     provider: "sqlite",
   }),
+  session: {
+    expiresIn: 60 * 60 * 24 * 7,
+    updateAge: 60 * 60 * 24,
+  },
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,

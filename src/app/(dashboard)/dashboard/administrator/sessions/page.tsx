@@ -36,6 +36,10 @@ const SessionsPage = async ({ searchParams }: SessionsPageProps) => {
 
   const now = new Date();
 
+  const cleanup = await prisma.session.deleteMany({
+    where: { expiresAt: { lte: now } },
+  });
+
   const total = await prisma.session.count();
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(requestedPage, totalPages);
@@ -63,6 +67,28 @@ const SessionsPage = async ({ searchParams }: SessionsPageProps) => {
     take: PAGE_SIZE,
   });
 
+  const activeGroups = await prisma.session.groupBy({
+    _count: { id: true },
+    by: ["userId"],
+    orderBy: { _count: { id: "desc" } },
+    where: { expiresAt: { gt: now } },
+  });
+  const groupUsers = await prisma.user.findMany({
+    select: { email: true, id: true, name: true, role: true },
+    where: { id: { in: activeGroups.map((group) => group.userId) } },
+  });
+  const groupUserById = new Map(groupUsers.map((user) => [user.id, user]));
+  const groups = activeGroups.map((group) => ({
+    activeCount: group._count.id,
+    user: groupUserById.get(group.userId) ?? {
+      email: "",
+      id: group.userId,
+      name: "Unknown user",
+      role: "student",
+    },
+    userId: group.userId,
+  }));
+
   const rows = sessions.map((row) => ({
     createdAt: row.createdAt,
     expiresAt: row.expiresAt,
@@ -87,7 +113,7 @@ const SessionsPage = async ({ searchParams }: SessionsPageProps) => {
           { href: "/dashboard", label: "Dashboard" },
           {
             href: "/dashboard/administrator",
-            label: "Administrator workspace",
+            label: "Overview",
           },
           { label: "Sessions" },
         ]}
@@ -97,6 +123,9 @@ const SessionsPage = async ({ searchParams }: SessionsPageProps) => {
         title="Sessions"
       />
       <SessionsList
+        clearedExpired={cleanup.count}
+        currentUserId={current?.user.id ?? null}
+        groups={groups}
         page={page}
         rows={rows}
         total={total}

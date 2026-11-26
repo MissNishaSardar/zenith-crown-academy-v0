@@ -23,7 +23,7 @@ const SettingsPage = async () => {
           { href: "/dashboard", label: "Dashboard" },
           {
             href: "/dashboard/administrator",
-            label: "Administrator workspace",
+            label: "Overview",
           },
           { label: "Settings" },
         ]}

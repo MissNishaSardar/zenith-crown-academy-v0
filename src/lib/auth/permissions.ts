@@ -3,14 +3,17 @@ import { createAccessControl } from "better-auth/plugins/access";
 // Mirrors the Admin plugin built in resource actions so admin operations stay
 // assignable to custom roles. Academy resources carry the delegation
 // boundaries for owner, administrator, principal, and vice principal.
+// Impersonation is intentionally omitted. Without impersonate and
+// impersonate-admins in the statement, the admin plugin denies
+// impersonate-user for every role, so no new impersonation can start.
+// Stopping a legacy impersonated session stays available through a
+// dedicated stop-only server action that calls stopImpersonating directly.
 const statement = {
   user: [
     "create",
     "list",
     "set-role",
     "ban",
-    "impersonate",
-    "impersonate-admins",
     "delete",
     "set-password",
     "set-email",

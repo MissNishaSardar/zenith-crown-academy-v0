@@ -251,6 +251,14 @@ export const revokeSessionSchema = z.object({
 
 export type revokeSessionType = z.infer<typeof revokeSessionSchema>;
 
+export const revokeAllUserSessionsSchema = z.object({
+  userId: z.string().min(1, { error: "Missing user" }),
+});
+
+export type revokeAllUserSessionsType = z.infer<
+  typeof revokeAllUserSessionsSchema
+>;
+
 export const schoolSettingsSchema = z
   .object({
     academicYear: z
@@ -326,9 +334,3 @@ export const schoolSettingsSchema = z
   });
 
 export type schoolSettingsType = z.infer<typeof schoolSettingsSchema>;
-
-export const impersonateUserSchema = z.object({
-  userId: z.string().min(1, { error: "Missing user id" }),
-});
-
-export type impersonateUserType = z.infer<typeof impersonateUserSchema>;

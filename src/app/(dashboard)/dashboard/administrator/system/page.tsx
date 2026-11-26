@@ -21,7 +21,7 @@ const SystemPage = async () => {
           { href: "/dashboard", label: "Dashboard" },
           {
             href: "/dashboard/administrator",
-            label: "Administrator workspace",
+            label: "Overview",
           },
           { label: "System health" },
         ]}

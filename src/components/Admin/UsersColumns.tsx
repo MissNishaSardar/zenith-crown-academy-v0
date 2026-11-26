@@ -4,6 +4,7 @@ import { legacyCreateColumnHelper } from "@tanstack/react-table/legacy";
 import { Badge } from "@/components/shadcnui/badge";
 import { Button } from "@/components/shadcnui/button";
 import { roleLabels, type RoleName } from "@/lib/auth/permissions";
+import { formatDateDisplay } from "@/lib/formatDate";
 
 import UserRowActions from "./UserRowActions";
 
@@ -17,13 +18,6 @@ export type UsersRow = {
   roles: RoleName[];
   username: string;
 };
-
-const formatDate = (value: Date): string =>
-  new Date(value).toLocaleDateString("en-US", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 
 const SortableHeader = ({
   column,
@@ -121,7 +115,9 @@ export const usersColumns = columnHelper.columns([
   }),
   columnHelper.accessor("createdAt", {
     cell: ({ getValue }) => (
-      <span className="text-muted-foreground">{formatDate(getValue())}</span>
+      <span className="text-muted-foreground">
+        {formatDateDisplay(getValue())}
+      </span>
     ),
     header: ({ column }) => (
       <SortableHeader

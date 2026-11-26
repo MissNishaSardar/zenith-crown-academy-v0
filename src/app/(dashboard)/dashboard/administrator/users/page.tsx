@@ -156,7 +156,7 @@ const UsersPage = async ({ searchParams }: UsersPageProps) => {
           { href: "/dashboard", label: "Dashboard" },
           {
             href: "/dashboard/administrator",
-            label: "Administrator workspace",
+            label: "Overview",
           },
           { label: "Users" },
         ]}

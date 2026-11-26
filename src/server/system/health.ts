@@ -28,6 +28,7 @@ export type EnvHealth = {
 
 export type RuntimeHealth = {
   memoryMb: number | null;
+  memoryTotalMb: number | null;
   message: string;
   nodeVersion: string;
   ok: boolean;
@@ -64,7 +65,7 @@ const checkDatabase = async (): Promise<DatabaseHealth> => {
     ]);
     return {
       latencyMs: Math.round(performance.now() - startedAt),
-      message: "Database is reachable.",
+      message: "Classes and sign in are working.",
       ok: true,
       sessionCount,
       userCount,
@@ -72,7 +73,7 @@ const checkDatabase = async (): Promise<DatabaseHealth> => {
   } catch {
     return {
       latencyMs: null,
-      message: "Database is unreachable.",
+      message: "Classes and sign in need attention. Try again shortly.",
       ok: false,
       sessionCount: null,
       userCount: null,
@@ -83,9 +84,9 @@ const checkDatabase = async (): Promise<DatabaseHealth> => {
 const checkStorage = async (): Promise<StorageHealth> => {
   try {
     await access(join(process.cwd(), "public", "uploads"), constants.W_OK);
-    return { message: "Uploads directory is writable.", ok: true };
+    return { message: "File uploads can save.", ok: true };
   } catch {
-    return { message: "Uploads directory is not writable.", ok: false };
+    return { message: "File uploads cannot save right now.", ok: false };
   }
 };
 
@@ -98,20 +99,20 @@ const checkEnv = async (): Promise<EnvHealth> => {
     betterAuthSecretSet,
     betterAuthUrlSet,
     databaseUrlSet,
-    message:
-      ok ?
-        "Required env values are set."
-      : "One or more env values are missing.",
+    message: ok ? "Settings are complete." : "Some settings are missing.",
     ok,
   };
 };
 
 const checkRuntime = async (): Promise<RuntimeHealth> => {
   try {
-    const memoryMb = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+    const usage = process.memoryUsage();
+    const memoryMb = Math.round(usage.heapUsed / 1024 / 1024);
+    const memoryTotalMb = Math.round(usage.heapTotal / 1024 / 1024);
     return {
       memoryMb,
-      message: "Runtime readings collected.",
+      memoryTotalMb,
+      message: "Server readings look normal.",
       nodeVersion: process.version,
       ok: true,
       uptimeSec: Math.round(process.uptime()),
@@ -119,7 +120,8 @@ const checkRuntime = async (): Promise<RuntimeHealth> => {
   } catch {
     return {
       memoryMb: null,
-      message: "Runtime readings unavailable.",
+      memoryTotalMb: null,
+      message: "Server readings are unavailable.",
       nodeVersion: "unknown",
       ok: false,
       uptimeSec: 0,

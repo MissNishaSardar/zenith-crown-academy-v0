@@ -36,6 +36,7 @@ import {
 } from "@/components/shadcnui/field";
 import { Input } from "@/components/shadcnui/input";
 import { withMinimumLoad } from "@/lib/auth/withMinimumLoad";
+import { formatDateTimeDisplay } from "@/lib/formatDate";
 import { generatePassword } from "@/lib/auth/passwordGenerator";
 import {
   buildCredentialFilename,
@@ -149,7 +150,7 @@ const CreateUserDialog = ({ onOpenChange, open }: CreateUserDialogProps) => {
     setCreatedUsername(result.user.username);
     setCreatedEmail(result.user.email);
     setCreatedRole(result.user.role);
-    setCreatedIssuedAt(new Date().toLocaleString());
+    setCreatedIssuedAt(formatDateTimeDisplay(new Date()));
     setCreatedLoginUrl(`${window.location.origin}/login`);
     setCreatedPassword(values.password);
     reset();

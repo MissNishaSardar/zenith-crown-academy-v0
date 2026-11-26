@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { Route } from "next";
-import { Badge } from "@/components/shadcnui/badge";
 import { Button } from "@/components/shadcnui/button";
 import {
   Table,
@@ -14,6 +13,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/shadcnui/table";
+import {
+  formatAuditValue,
+  getAuditEntityLabel,
+  getAuditFieldLabel,
+  getAuditSummary,
+  getAuditTitle,
+  getRelativeTime,
+} from "@/lib/admin/auditPresentation";
 
 export type AuditRowDiff = {
   after: unknown;
@@ -41,23 +48,6 @@ type AuditListProps = {
   rows: AuditRow[];
   total: number;
   totalPages: number;
-};
-
-const formatValue = (value: unknown): string => {
-  if (value === null || value === undefined) {
-    return "—";
-  }
-  if (typeof value === "string") {
-    return value === "" ? "—" : value;
-  }
-  if (typeof value === "boolean") {
-    return value ? "true" : "false";
-  }
-  try {
-    return JSON.stringify(value) ?? String(value);
-  } catch {
-    return String(value);
-  }
 };
 
 const buildPageHref = (
@@ -97,16 +87,19 @@ const AuditList = ({
     base,
   ) as Route;
 
+  const toggleRow = (id: string) => {
+    setExpandedId((current) => (current === id ? null : id));
+  };
+
   return (
     <div className="overflow-hidden rounded-xl border">
-      <Table className="min-w-[760px]">
+      <Table className="min-w-[720px]">
         <TableHeader>
           <TableRow>
             <TableHead>Time</TableHead>
-            <TableHead>Entity</TableHead>
-            <TableHead>Action</TableHead>
+            <TableHead>Activity</TableHead>
             <TableHead>Actor</TableHead>
-            <TableHead>Changed fields</TableHead>
+            <TableHead>Change</TableHead>
             <TableHead aria-label="Details" />
           </TableRow>
         </TableHeader>
@@ -114,63 +107,84 @@ const AuditList = ({
           {rows.length > 0 ?
             rows.map((row) => {
               const expanded = expandedId === row.id;
+              const title = getAuditTitle(row.entity, row.action);
+              const summary = getAuditSummary(row.diffs);
               return (
-                <TableRow key={row.id}>
-                  <TableCell className="text-muted-foreground whitespace-nowrap">
-                    {row.createdAtDisplay}
+                <TableRow
+                  className="hover:bg-muted/40 cursor-pointer"
+                  key={row.id}
+                  onClick={() => toggleRow(row.id)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) {
+                      return;
+                    }
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      toggleRow(row.id);
+                    }
+                  }}
+                  tabIndex={0}>
+                  <TableCell className="text-muted-foreground px-2 py-1.5 whitespace-nowrap">
+                    <time
+                      dateTime={row.createdAt}
+                      title={row.createdAtDisplay}>
+                      {getRelativeTime(row.createdAt)}
+                    </time>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{row.entity}</Badge>
+                  <TableCell className="max-w-[280px] px-2 py-1.5">
+                    <span className="block truncate text-xs font-semibold">
+                      {title}
+                    </span>
+                    <span className="text-muted-foreground block truncate text-xs">
+                      {getAuditEntityLabel(row.entity)}
+                    </span>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{row.action}</Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground max-w-[220px] truncate">
+                  <TableCell className="text-muted-foreground max-w-[200px] truncate px-2 py-1.5 text-xs">
                     {row.actorEmail ?? "System"}
                     {row.actorRole ? ` · ${row.actorRole}` : null}
                   </TableCell>
-                  <TableCell className="max-w-[280px] whitespace-normal">
-                    {row.diffs.length > 0 ?
-                      <span className="text-muted-foreground text-xs">
-                        {row.diffs.map((diff) => diff.field).join(", ")}
+                  <TableCell className="max-w-[260px] px-2 py-1.5">
+                    <span className="text-muted-foreground block truncate text-xs">
+                      {summary}
+                    </span>
+                    {expanded ?
+                      <span
+                        className="mt-1.5 flex min-w-[260px] flex-col gap-1"
+                        onClick={(event) => event.stopPropagation()}>
+                        {row.diffs.length > 0 ?
+                          <span className="flex flex-col gap-1 text-xs">
+                            {row.diffs.map((diff) => (
+                              <span
+                                className="rounded-md border px-2 py-1"
+                                key={diff.field}>
+                                <span className="font-semibold">
+                                  {getAuditFieldLabel(diff.field)}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {`: ${formatAuditValue(diff.before)} to ${formatAuditValue(diff.after)}`}
+                                </span>
+                              </span>
+                            ))}
+                          </span>
+                        : <span className="text-muted-foreground text-xs">
+                            No field changes
+                          </span>
+                        }
                       </span>
-                    : <span className="text-muted-foreground text-xs">
-                        No field changes
-                      </span>
-                    }
+                    : null}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="px-2 py-1.5">
                     <Button
                       aria-expanded={expanded}
-                      onClick={() => setExpandedId(expanded ? null : row.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        toggleRow(row.id);
+                      }}
                       size="sm"
                       type="button"
                       variant="ghost">
                       {expanded ? "Hide" : "Details"}
                     </Button>
-                    {expanded ?
-                      <div className="mt-2 flex min-w-[280px] flex-col gap-2">
-                        {row.diffs.length > 0 ?
-                          <ul className="flex flex-col gap-1 text-xs">
-                            {row.diffs.map((diff) => (
-                              <li
-                                className="rounded-md border px-2 py-1"
-                                key={diff.field}>
-                                <span className="font-semibold">
-                                  {diff.field}
-                                </span>
-                                <span className="text-muted-foreground">
-                                  {`: ${formatValue(diff.before)} → ${formatValue(diff.after)}`}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        : <span className="text-muted-foreground text-xs">
-                            No field changes
-                          </span>
-                        }
-                      </div>
-                    : null}
                   </TableCell>
                 </TableRow>
               );
@@ -178,7 +192,7 @@ const AuditList = ({
           : <TableRow>
               <TableCell
                 className="h-24 text-center"
-                colSpan={6}>
+                colSpan={5}>
                 {hasFilter ?
                   "No audit rows match these filters."
                 : "No audit rows yet. Actions will appear here."}

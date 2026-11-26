@@ -63,7 +63,8 @@ export const getDashboardLinks = (
     ...roles.map((role) => ({
       href: `/dashboard/${roleUrlSlug(role)}`,
       icon: roleIcons[role],
-      label: `${roleLabels[role]} workspace`,
+      label:
+        role === "administrator" ? "Overview" : `${roleLabels[role]} workspace`,
     })),
     {
       href: "/dashboard/administrator/users",
