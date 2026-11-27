@@ -164,6 +164,12 @@ const academicsLinks: DashboardLink[] = [
     requiredPermission: "academic:view",
   },
   {
+    href: `${ACADEMICS_BASE}/curriculum`,
+    icon: Library,
+    label: "Curriculum",
+    requiredPermission: "academic:view",
+  },
+  {
     href: `${ACADEMICS_BASE}/leave`,
     icon: Inbox,
     label: "Leave",

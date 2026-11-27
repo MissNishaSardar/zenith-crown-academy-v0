@@ -87,6 +87,9 @@ const AssignmentsPage = async ({ searchParams }: PageProps) => {
     orderBy: [{ code: "asc" }],
     select: { code: true, id: true, name: true },
   });
+  const classSubjects = await prisma.classSubject.findMany({
+    select: { classId: true, subjectId: true },
+  });
 
   const ownStudent = await prisma.studentProfile.findFirst({
     select: { firstName: true, id: true, lastName: true },
@@ -474,6 +477,7 @@ const AssignmentsPage = async ({ searchParams }: PageProps) => {
         <AssignmentDialog
           canWrite={canGradeBase && canWrite}
           classes={classes}
+          classSubjects={classSubjects}
           sections={sections}
           subjects={subjects}
           years={years}
@@ -482,6 +486,7 @@ const AssignmentsPage = async ({ searchParams }: PageProps) => {
       <AssignmentsDataTable
         canWrite={canWrite}
         classes={classes}
+        classSubjects={classSubjects}
         dir={dir}
         expandedById={expandedById}
         page={page}

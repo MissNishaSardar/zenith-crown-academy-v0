@@ -1400,3 +1400,84 @@ export const assignmentGradeSchema = z.object({
 });
 
 export type assignmentGradeType = z.infer<typeof assignmentGradeSchema>;
+
+export const curriculumSourceNames = ["SCHOOL_DEFINED", "CBSE_LOCKED"] as const;
+
+export const SYSTEM_CURRICULUM_FLOOR = 4;
+
+export const MIN_CURRICULUM_MINIMUM = 4;
+
+export const MAX_CURRICULUM_MINIMUM = 30;
+
+export const isLockedClassOrder = (order: number): boolean => order >= 12;
+
+export const curriculumUnitSchema = z.object({
+  classId: z.string().min(1, { error: "Pick a class" }),
+  id: z.string().min(1, { error: "Missing unit id" }).optional(),
+  objectives: z.string().trim().max(2000).nullable().optional(),
+  order: z
+    .number()
+    .int({ error: "Order must be a whole number" })
+    .min(1, { error: "Order must be at least 1" })
+    .max(200, { error: "Order is too large" })
+    .optional(),
+  streamId: z.string().trim().max(100).nullable().optional(),
+  subjectId: z.string().min(1, { error: "Pick a subject" }),
+  title: z
+    .string()
+    .trim()
+    .min(1, { error: "Enter a title" })
+    .max(120, { error: "Title is too long" }),
+  yearId: z.string().min(1, { error: "Pick an academic year" }),
+});
+
+export type curriculumUnitType = z.infer<typeof curriculumUnitSchema>;
+
+export const curriculumMinimumSchema = z.object({
+  classId: z.string().min(1, { error: "Pick a class" }),
+  minUnits: z
+    .number()
+    .int({ error: "Minimum must be a whole number" })
+    .min(MIN_CURRICULUM_MINIMUM, {
+      error: `Minimum is at least ${MIN_CURRICULUM_MINIMUM}`,
+    })
+    .max(MAX_CURRICULUM_MINIMUM, {
+      error: `Minimum is at most ${MAX_CURRICULUM_MINIMUM}`,
+    }),
+  subjectId: z.string().min(1, { error: "Pick a subject" }),
+  yearId: z.string().min(1, { error: "Pick an academic year" }),
+});
+
+export type curriculumMinimumType = z.infer<typeof curriculumMinimumSchema>;
+
+export const curriculumReorderSchema = z.object({
+  classId: z.string().min(1, { error: "Pick a class" }),
+  streamId: z.string().trim().max(100).nullable().optional(),
+  subjectId: z.string().min(1, { error: "Pick a subject" }),
+  unitIds: z
+    .array(z.string().min(1, { error: "Pick valid units" }))
+    .min(1, { error: "Add at least one unit" })
+    .max(200, { error: "Too many units" }),
+  yearId: z.string().min(1, { error: "Pick an academic year" }),
+});
+
+export type curriculumReorderType = z.infer<typeof curriculumReorderSchema>;
+
+export const curriculumLockedEditRequestSchema = z.object({
+  objectives: z.string().trim().max(2000).nullable().optional(),
+  reason: z
+    .string()
+    .trim()
+    .min(1, { error: "Enter a reason" })
+    .max(500, { error: "Reason is too long" }),
+  title: z
+    .string()
+    .trim()
+    .min(1, { error: "Enter a title" })
+    .max(120, { error: "Title is too long" }),
+  unitId: z.string().min(1, { error: "Missing unit" }),
+});
+
+export type curriculumLockedEditRequestType = z.infer<
+  typeof curriculumLockedEditRequestSchema
+>;

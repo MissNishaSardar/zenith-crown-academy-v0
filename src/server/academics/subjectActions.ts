@@ -59,6 +59,25 @@ export const createSubject = async (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
+      // Idempotent retry: a prior partial mapping may have created the
+      // subject already. Reuse it only when code and name match.
+      const existing = await prisma.subject.findUnique({
+        where: { code: parsed.data.code },
+      });
+      if (
+        existing &&
+        existing.name.trim().toLowerCase() ===
+          parsed.data.name.trim().toLowerCase()
+      ) {
+        return {
+          ok: true,
+          subject: {
+            code: existing.code,
+            id: existing.id,
+            name: existing.name,
+          },
+        };
+      }
       return {
         errors: { code: "This subject code already exists." },
         ok: false,
@@ -277,10 +296,9 @@ export const addStreamSubject = async (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
-      return {
-        errors: { root: "This subject is already in this stream." },
-        ok: false,
-      };
+      // Idempotent retry: multi-pick mapping may resubmit an already
+      // mapped subject after a partial success.
+      return { ok: true };
     }
     throw error;
   }

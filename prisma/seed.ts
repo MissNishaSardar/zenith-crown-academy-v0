@@ -599,6 +599,139 @@ const main = async () => {
     }
     console.log("Seeded staff, guardians, and students for B1");
   }
+
+  const demoSubjects = [
+    { code: "ENG", name: "English" },
+    { code: "MATH", name: "Mathematics" },
+    { code: "SCI", name: "Science" },
+  ];
+  for (const demo of demoSubjects) {
+    await prisma.subject.upsert({
+      create: { code: demo.code, name: demo.name },
+      update: { name: demo.name },
+      where: { code: demo.code },
+    });
+  }
+  const english = await prisma.subject.findUnique({ where: { code: "ENG" } });
+  const math = await prisma.subject.findUnique({ where: { code: "MATH" } });
+  const science = await prisma.subject.findUnique({ where: { code: "SCI" } });
+  const currentYearForCurriculum =
+    (await prisma.academicYear.findFirst({
+      where: { status: "CURRENT" },
+    })) ?? null;
+  const class1ForCurriculum = await prisma.schoolClass.findUnique({
+    where: { name: "Class 1" },
+  });
+  const class9ForCurriculum = await prisma.schoolClass.findUnique({
+    where: { name: "Class 9" },
+  });
+  if (
+    currentYearForCurriculum &&
+    class1ForCurriculum &&
+    class9ForCurriculum &&
+    english &&
+    math &&
+    science
+  ) {
+    for (const link of [
+      { classId: class1ForCurriculum.id, subjectId: english.id },
+      { classId: class1ForCurriculum.id, subjectId: math.id },
+      { classId: class9ForCurriculum.id, subjectId: science.id },
+    ]) {
+      await prisma.classSubject.upsert({
+        create: {
+          classId: link.classId,
+          isOptional: false,
+          subjectId: link.subjectId,
+        },
+        update: {},
+        where: {
+          classId_subjectId: {
+            classId: link.classId,
+            subjectId: link.subjectId,
+          },
+        },
+      });
+    }
+    await prisma.curriculumMinimum.upsert({
+      create: {
+        classId: class1ForCurriculum.id,
+        minUnits: 4,
+        subjectId: english.id,
+        yearId: currentYearForCurriculum.id,
+      },
+      update: { minUnits: 4 },
+      where: {
+        yearId_classId_subjectId: {
+          classId: class1ForCurriculum.id,
+          subjectId: english.id,
+          yearId: currentYearForCurriculum.id,
+        },
+      },
+    });
+    const demoUnits: {
+      classId: string;
+      order: number;
+      source: "SCHOOL_DEFINED" | "CBSE_LOCKED";
+      subjectId: string;
+      title: string;
+    }[] = [
+      {
+        classId: class1ForCurriculum.id,
+        order: 1,
+        source: "SCHOOL_DEFINED",
+        subjectId: english.id,
+        title: "Alphabet and phonics",
+      },
+      {
+        classId: class1ForCurriculum.id,
+        order: 2,
+        source: "SCHOOL_DEFINED",
+        subjectId: english.id,
+        title: "Simple sentences",
+      },
+      {
+        classId: class9ForCurriculum.id,
+        order: 1,
+        source: "CBSE_LOCKED",
+        subjectId: science.id,
+        title: "Matter in our surroundings",
+      },
+      {
+        classId: class9ForCurriculum.id,
+        order: 2,
+        source: "CBSE_LOCKED",
+        subjectId: science.id,
+        title: "Motion and force",
+      },
+    ];
+    for (const demoUnit of demoUnits) {
+      const existing = await prisma.curriculumUnit.findFirst({
+        where: {
+          classId: demoUnit.classId,
+          streamId: null,
+          subjectId: demoUnit.subjectId,
+          title: demoUnit.title,
+          yearId: currentYearForCurriculum.id,
+        },
+      });
+      if (!existing) {
+        await prisma.curriculumUnit.create({
+          data: {
+            classId: demoUnit.classId,
+            objectives: null,
+            order: demoUnit.order,
+            source: demoUnit.source,
+            streamId: null,
+            subjectId: demoUnit.subjectId,
+            title: demoUnit.title,
+            yearId: currentYearForCurriculum.id,
+          },
+        });
+      }
+    }
+    console.log("Seeded curriculum demo units and minimum for F1");
+  }
 };
 
 main()

@@ -4,8 +4,9 @@ import { BreadcrumbTrail } from "@/components/Layout/Breadcrumbs";
 import PageHeader from "@/components/Layout/PageHeader";
 import SubjectsList from "@/components/Academics/SubjectsList";
 import { getAcademicsTrail } from "@/lib/dashboard-nav";
+import { can } from "@/lib/auth/permissions";
 import prisma from "@/lib/dbClient/prisma";
-import { requirePermission } from "@/server/guards";
+import { getFreshRoleContext, requirePermission } from "@/server/guards";
 
 export const metadata: Metadata = {
   title: "Subjects",
@@ -35,7 +36,9 @@ const isSortKey = (value: string): value is SortKey =>
   (sortKeys as readonly string[]).includes(value);
 
 const SubjectsPage = async ({ searchParams }: PageProps) => {
-  await requirePermission("academic:view");
+  const session = await requirePermission("academic:view");
+  const { active } = await getFreshRoleContext(session.user.id);
+  const canWrite = active !== null && can(active, "academic:manage-curriculum");
   const raw = await searchParams;
   const search = firstParam(raw.search).trim().slice(0, 100);
   const parsedPage = Number.parseInt(firstParam(raw.page), 10);
@@ -77,6 +80,15 @@ const SubjectsPage = async ({ searchParams }: PageProps) => {
     streamCount: subject._count.streamLinks,
   }));
 
+  const classes = await prisma.schoolClass.findMany({
+    orderBy: [{ order: "asc" }],
+    select: { id: true, name: true, order: true },
+  });
+  const streams = await prisma.stream.findMany({
+    orderBy: [{ name: "asc" }],
+    select: { classId: true, id: true, name: true },
+  });
+
   return (
     <div className="flex flex-1 flex-col gap-6">
       <BreadcrumbTrail items={getAcademicsTrail("Subjects")} />
@@ -85,12 +97,15 @@ const SubjectsPage = async ({ searchParams }: PageProps) => {
         title="Subjects"
       />
       <SubjectsList
+        canWrite={canWrite}
+        classes={classes}
         dir={dir}
         page={page}
         pageSize={PAGE_SIZE}
         rows={rows}
         search={search}
         sort={sort}
+        streams={streams}
         total={total}
         totalPages={totalPages}
       />

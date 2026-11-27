@@ -270,6 +270,8 @@ export const AUDIT_ENTITY_OPTIONS = [
   "leave-request",
   "assignment",
   "assignment-submission",
+  "curriculum-unit",
+  "curriculum-minimum",
 ] as const;
 
 export const AUDIT_USER_ACTION_OPTIONS = [

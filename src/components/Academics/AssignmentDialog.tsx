@@ -49,6 +49,7 @@ type AssignmentDialogProps = {
   assignment?: AssignmentEdit | null;
   canWrite: boolean;
   classes: { id: string; name: string }[];
+  classSubjects: { classId: string; subjectId: string }[];
   sections: { classId: string; id: string; name: string; yearId: string }[];
   subjects: { code: string; id: string; name: string }[];
   years: { id: string; name: string; status: string }[];
@@ -58,6 +59,7 @@ const AssignmentDialog = ({
   assignment,
   canWrite,
   classes,
+  classSubjects,
   sections,
   subjects,
   years,
@@ -68,9 +70,11 @@ const AssignmentDialog = ({
 
   const {
     control,
+    getValues,
     handleSubmit,
     reset,
     setError,
+    setValue,
     watch,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<assignmentType>({
@@ -97,6 +101,27 @@ const AssignmentDialog = ({
       (row) => row.yearId === yearId && row.classId === classId,
     );
   }, [sections, yearId, classId]);
+
+  const visibleSubjects = useMemo(() => {
+    if (!classId) return [];
+    const ids = new Set(
+      classSubjects
+        .filter((row) => row.classId === classId)
+        .map((row) => row.subjectId),
+    );
+    if (ids.size === 0) return [];
+    const scoped = subjects.filter((subject) => ids.has(subject.id));
+    if (
+      assignment?.subjectId &&
+      !scoped.some((subject) => subject.id === assignment.subjectId)
+    ) {
+      const current = subjects.find(
+        (subject) => subject.id === assignment.subjectId,
+      );
+      if (current) return [...scoped, current];
+    }
+    return scoped;
+  }, [assignment?.subjectId, classId, classSubjects, subjects]);
 
   const openCreate = () => {
     reset({
@@ -218,7 +243,22 @@ const AssignmentDialog = ({
                     <NativeSelect
                       id={field.name}
                       value={field.value}
-                      onChange={field.onChange}
+                      onChange={(event) => {
+                        const nextClass = event.target.value;
+                        field.onChange(event);
+                        const allowed = new Set(
+                          classSubjects
+                            .filter((row) => row.classId === nextClass)
+                            .map((row) => row.subjectId),
+                        );
+                        const currentSubject = getValues("subjectId");
+                        if (currentSubject && !allowed.has(currentSubject)) {
+                          setValue("subjectId", "", {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                        }
+                      }}
                       onBlur={field.onBlur}
                       aria-invalid={fieldState.invalid}>
                       <NativeSelectOption value="">
@@ -286,7 +326,7 @@ const AssignmentDialog = ({
                       <NativeSelectOption value="">
                         Pick a subject
                       </NativeSelectOption>
-                      {subjects.map((subject) => (
+                      {visibleSubjects.map((subject) => (
                         <NativeSelectOption
                           key={subject.id}
                           value={subject.id}>
@@ -294,6 +334,16 @@ const AssignmentDialog = ({
                         </NativeSelectOption>
                       ))}
                     </NativeSelect>
+                    {!classId ?
+                      <p className="text-muted-foreground text-xs">
+                        Pick a class to see its subjects.
+                      </p>
+                    : visibleSubjects.length === 0 ?
+                      <p className="text-muted-foreground text-xs">
+                        No subjects mapped to this class yet. Map one in
+                        Subjects first.
+                      </p>
+                    : null}
                     <FieldError errors={[fieldState.error]} />
                   </Field>
                 )}

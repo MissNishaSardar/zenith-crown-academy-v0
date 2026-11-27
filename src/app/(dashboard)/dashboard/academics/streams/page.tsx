@@ -4,8 +4,9 @@ import { BreadcrumbTrail } from "@/components/Layout/Breadcrumbs";
 import PageHeader from "@/components/Layout/PageHeader";
 import StreamsList from "@/components/Academics/StreamsList";
 import { getAcademicsTrail } from "@/lib/dashboard-nav";
+import { can } from "@/lib/auth/permissions";
 import prisma from "@/lib/dbClient/prisma";
-import { requirePermission } from "@/server/guards";
+import { getFreshRoleContext, requirePermission } from "@/server/guards";
 
 export const metadata: Metadata = {
   title: "Streams",
@@ -36,7 +37,9 @@ const isSortKey = (value: string): value is SortKey =>
   (sortKeys as readonly string[]).includes(value);
 
 const StreamsPage = async ({ searchParams }: PageProps) => {
-  await requirePermission("academic:view");
+  const session = await requirePermission("academic:view");
+  const { active } = await getFreshRoleContext(session.user.id);
+  const canWrite = active !== null && can(active, "academic:manage-curriculum");
   const raw = await searchParams;
   const search = firstParam(raw.search).trim().slice(0, 100);
   const classParam = firstParam(raw.classId);
@@ -78,7 +81,7 @@ const StreamsPage = async ({ searchParams }: PageProps) => {
       classId: true,
       id: true,
       name: true,
-      subjects: { select: { subject: { select: { code: true } } } },
+      subjects: { select: { subject: { select: { code: true, id: true } } } },
     },
     skip: (page - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
@@ -86,17 +89,28 @@ const StreamsPage = async ({ searchParams }: PageProps) => {
   });
 
   const rows = streams.map((stream) => {
-    const codes = stream.subjects
-      .map((link) => link.subject.code)
-      .sort((left, right) => left.localeCompare(right));
+    const links = stream.subjects
+      .map((link) => ({ code: link.subject.code, id: link.subject.id }))
+      .sort((left, right) => left.code.localeCompare(right.code));
+    const codes = links.map((link) => link.code);
     return {
+      canWrite,
       classId: stream.classId,
       className: stream.class.name,
       id: stream.id,
       name: stream.name,
       subjectCount: codes.length,
+      subjectIds: links.map((link) => link.id),
       subjectNames: codes.length > 0 ? codes.join(", ") : "No mapped subjects",
     };
+  });
+
+  const subjects = await prisma.subject.findMany({
+    orderBy: [{ code: "asc" }],
+    select: { code: true, id: true, name: true },
+  });
+  const classSubjects = await prisma.classSubject.findMany({
+    select: { classId: true, subjectId: true },
   });
 
   return (
@@ -107,14 +121,17 @@ const StreamsPage = async ({ searchParams }: PageProps) => {
         title="Streams"
       />
       <StreamsList
+        canWrite={canWrite}
         classId={classId}
         classes={streamClasses.map((row) => ({ id: row.id, name: row.name }))}
+        classSubjects={classSubjects}
         dir={dir}
         page={page}
         pageSize={PAGE_SIZE}
         rows={rows}
         search={search}
         sort={sort}
+        subjects={subjects}
         total={total}
         totalPages={totalPages}
       />

@@ -46,6 +46,7 @@ export type AssignmentExpanded = {
 type AssignmentsDataTableProps = {
   canWrite: boolean;
   classes: { id: string; name: string }[];
+  classSubjects: { classId: string; subjectId: string }[];
   dir: string;
   expandedById: Record<string, AssignmentExpanded>;
   page: number;
@@ -118,6 +119,7 @@ const assignmentColumns = assignmentHelper.columns([
 const AssignmentsDataTable = ({
   canWrite,
   classes,
+  classSubjects,
   dir,
   expandedById,
   page,
@@ -185,6 +187,7 @@ const AssignmentsDataTable = ({
                     assignment={detail.edit}
                     canWrite={canWrite}
                     classes={classes}
+                    classSubjects={classSubjects}
                     sections={sections}
                     subjects={subjects}
                     years={years}

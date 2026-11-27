@@ -225,6 +225,8 @@ model AcademicYear {
   timetableSlots TimetableSlot[]
   disciplineIncidents DisciplineIncident[]
   assignments Assignment[]
+  curriculumUnits CurriculumUnit[]
+  curriculumMinimums CurriculumMinimum[]
 
   @@map("academic_year")
 }
@@ -305,6 +307,8 @@ model SchoolClass {
   attendanceExceptions AttendanceException[]
   timetableSlots TimetableSlot[]
   assignments Assignment[]
+  curriculumUnits CurriculumUnit[]
+  curriculumMinimums CurriculumMinimum[]
 
   @@index([order])
   @@map("school_class")
@@ -322,6 +326,8 @@ model Subject {
   teacherAssignments TeacherAssignment[]
   timetableSlots TimetableSlot[]
   assignments Assignment[]
+  curriculumUnits CurriculumUnit[]
+  curriculumMinimums CurriculumMinimum[]
 
   @@map("subject")
 }
@@ -351,6 +357,7 @@ model Stream {
   updatedAt DateTime @updatedAt
   subjects  StreamSubject[]
   enrollments Enrollment[]
+  curriculumUnits CurriculumUnit[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -917,4 +924,50 @@ model AssignmentSubmission {
   @@index([assignmentId])
   @@index([studentId])
   @@map("assignment_submission")
+}
+
+enum CurriculumSource {
+  SCHOOL_DEFINED
+  CBSE_LOCKED
+}
+
+model CurriculumUnit {
+  id         String           @id @default(cuid())
+  yearId     String
+  year       AcademicYear     @relation(fields: [yearId], references: [id], onDelete: Restrict)
+  classId    String
+  class      SchoolClass      @relation(fields: [classId], references: [id], onDelete: Restrict)
+  streamId   String?
+  stream     Stream?          @relation(fields: [streamId], references: [id], onDelete: SetNull)
+  subjectId  String
+  subject    Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  title      String
+  order      Int
+  objectives String?
+  source     CurriculumSource @default(SCHOOL_DEFINED)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([yearId, classId, subjectId])
+  @@index([streamId])
+  @@index([source])
+  @@map("curriculum_unit")
+}
+
+model CurriculumMinimum {
+  id        String      @id @default(cuid())
+  yearId    String
+  year      AcademicYear @relation(fields: [yearId], references: [id], onDelete: Restrict)
+  classId   String
+  class     SchoolClass @relation(fields: [classId], references: [id], onDelete: Restrict)
+  subjectId String
+  subject   Subject     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  minUnits  Int
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([yearId, classId, subjectId])
+  @@index([yearId])
+  @@index([classId])
+  @@map("curriculum_minimum")
 }
