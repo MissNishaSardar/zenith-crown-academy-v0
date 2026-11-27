@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import { Button } from "@/components/shadcnui/button";
+import DatePickerField from "@/components/Layout/DatePickerField";
 import {
   Dialog,
   DialogContent,
@@ -123,11 +124,13 @@ const BanUserDialog = ({ onOpenChange, open, user }: BanUserDialogProps) => {
                   <FieldLabel htmlFor={field.name}>
                     Expiry date (optional)
                   </FieldLabel>
-                  <Input
-                    {...field}
+                  <DatePickerField
+                    ariaInvalid={fieldState.invalid}
                     id={field.name}
-                    type="date"
-                    aria-invalid={fieldState.invalid}
+                    onBlur={field.onBlur}
+                    onChange={field.onChange}
+                    placeholder="No expiry"
+                    value={field.value ?? ""}
                   />
                   <FieldError errors={[fieldState.error]} />
                 </Field>

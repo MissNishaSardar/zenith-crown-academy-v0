@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 
 import { BreadcrumbTrail } from "@/components/Layout/Breadcrumbs";
 import PageHeader from "@/components/Layout/PageHeader";
+import { Button } from "@/components/shadcnui/button";
+import { Field, FieldLabel } from "@/components/shadcnui/field";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/shadcnui/native-select";
 import ApprovalsDataTable from "@/components/Academics/ApprovalsDataTable";
 import { getAcademicsTrail } from "@/lib/dashboard-nav";
 import prisma from "@/lib/dbClient/prisma";
@@ -161,51 +167,47 @@ const ApprovalsPage = async ({ searchParams }: PageProps) => {
       <form
         className="flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-end"
         method="get">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">Entity</span>
-          <select
-            className="border-input bg-background h-9 rounded-md border px-2"
+        <Field className="w-full sm:w-48">
+          <FieldLabel htmlFor="approvals-entity">Entity</FieldLabel>
+          <NativeSelect
             defaultValue={entityParam}
+            id="approvals-entity"
             name="entity">
-            <option value="admission">Admission</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">Action</span>
-          <select
-            className="border-input bg-background h-9 rounded-md border px-2"
+            <NativeSelectOption value="admission">Admission</NativeSelectOption>
+          </NativeSelect>
+        </Field>
+        <Field className="w-full sm:w-48">
+          <FieldLabel htmlFor="approvals-action">Action</FieldLabel>
+          <NativeSelect
             defaultValue={action}
+            id="approvals-action"
             name="action">
             {APPROVAL_ACTIONS.map((option) => (
-              <option
+              <NativeSelectOption
                 key={option}
                 value={option}>
                 {option}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">Status</span>
-          <select
-            className="border-input bg-background h-9 rounded-md border px-2"
+          </NativeSelect>
+        </Field>
+        <Field className="w-full sm:w-48">
+          <FieldLabel htmlFor="approvals-status">Status</FieldLabel>
+          <NativeSelect
             defaultValue={status}
+            id="approvals-status"
             name="status">
-            <option value="all">All statuses</option>
+            <NativeSelectOption value="all">All statuses</NativeSelectOption>
             {approvalStatusNames.map((option) => (
-              <option
+              <NativeSelectOption
                 key={option}
                 value={option}>
                 {option}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
-        </label>
-        <button
-          className="bg-primary text-primary-foreground h-9 rounded-md px-4 text-sm font-medium"
-          type="submit">
-          Apply filters
-        </button>
+          </NativeSelect>
+        </Field>
+        <Button type="submit">Apply filters</Button>
       </form>
       <ApprovalsDataTable
         isRedacted={isRedacted}

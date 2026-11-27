@@ -7,6 +7,8 @@ import type { Route } from "next";
 import { getCoreRowModel, useLegacyTable } from "@tanstack/react-table/legacy";
 import { legacyCreateColumnHelper } from "@tanstack/react-table/legacy";
 import { Button } from "@/components/shadcnui/button";
+import { Badge } from "@/components/shadcnui/badge";
+import { Card, CardContent } from "@/components/shadcnui/card";
 import DataTable, {
   DataTablePagination,
   DataTableSortButton,
@@ -61,9 +63,11 @@ const classesColumns = columnHelper.columns([
   }),
   columnHelper.accessor("band", {
     cell: ({ getValue }) => (
-      <span className="bg-secondary text-secondary-foreground w-fit rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap">
+      <Badge
+        variant="secondary"
+        className="w-fit whitespace-nowrap">
         {String(getValue()).replace("_", " ")}
-      </span>
+      </Badge>
     ),
     header: ({ column }) => (
       <DataTableSortButton
@@ -154,55 +158,59 @@ const ClassesList = ({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-end sm:gap-4">
-        <Field className="flex-1">
-          <FieldLabel htmlFor="classes-search">Search classes</FieldLabel>
-          <Input
-            autoComplete="off"
-            id="classes-search"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Class name like Class 10"
-            type="search"
-            value={search}
-          />
-        </Field>
-        <Field className="sm:w-auto">
-          <FieldLabel htmlFor="classes-band">Band</FieldLabel>
-          <NativeSelect
-            className="w-full sm:w-44"
-            id="classes-band"
-            onChange={(event) => {
-              const params = new URLSearchParams();
-              if (search.trim()) params.set("search", search.trim());
-              if (event.target.value !== "all")
-                params.set("band", event.target.value);
-              params.set("page", "1");
-              router.replace(`${pathname}?${params.toString()}` as Route);
+      <Card>
+        <CardContent className="sm:flex-row sm:items-end sm:gap-4">
+          <Field className="flex-1">
+            <FieldLabel htmlFor="classes-search">Search classes</FieldLabel>
+            <Input
+              autoComplete="off"
+              id="classes-search"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Class name like Class 10"
+              type="search"
+              value={search}
+            />
+          </Field>
+          <Field className="sm:w-auto">
+            <FieldLabel htmlFor="classes-band">Band</FieldLabel>
+            <NativeSelect
+              className="w-full sm:w-44"
+              id="classes-band"
+              onChange={(event) => {
+                const params = new URLSearchParams();
+                if (search.trim()) params.set("search", search.trim());
+                if (event.target.value !== "all")
+                  params.set("band", event.target.value);
+                params.set("page", "1");
+                router.replace(`${pathname}?${params.toString()}` as Route);
+              }}
+              value={band}>
+              <NativeSelectOption value="all">All bands</NativeSelectOption>
+              <NativeSelectOption value="PRE_PRIMARY">
+                Pre primary
+              </NativeSelectOption>
+              <NativeSelectOption value="PRIMARY">Primary</NativeSelectOption>
+              <NativeSelectOption value="MIDDLE">Middle</NativeSelectOption>
+              <NativeSelectOption value="SECONDARY">
+                Secondary
+              </NativeSelectOption>
+              <NativeSelectOption value="SENIOR_SECONDARY">
+                Senior secondary
+              </NativeSelectOption>
+            </NativeSelect>
+          </Field>
+          <Button
+            disabled={search.trim() === "" && band === "all"}
+            onClick={() => {
+              setSearch("");
+              router.replace(`${pathname}?page=1` as Route);
             }}
-            value={band}>
-            <NativeSelectOption value="all">All bands</NativeSelectOption>
-            <NativeSelectOption value="PRE_PRIMARY">
-              Pre primary
-            </NativeSelectOption>
-            <NativeSelectOption value="PRIMARY">Primary</NativeSelectOption>
-            <NativeSelectOption value="MIDDLE">Middle</NativeSelectOption>
-            <NativeSelectOption value="SECONDARY">Secondary</NativeSelectOption>
-            <NativeSelectOption value="SENIOR_SECONDARY">
-              Senior secondary
-            </NativeSelectOption>
-          </NativeSelect>
-        </Field>
-        <Button
-          disabled={search.trim() === "" && band === "all"}
-          onClick={() => {
-            setSearch("");
-            router.replace(`${pathname}?page=1` as Route);
-          }}
-          type="button"
-          variant="outline">
-          Clear
-        </Button>
-      </div>
+            type="button"
+            variant="outline">
+            Clear
+          </Button>
+        </CardContent>
+      </Card>
       <div className="overflow-hidden rounded-xl border">
         <DataTable
           emptyMessage="No classes match these filters."

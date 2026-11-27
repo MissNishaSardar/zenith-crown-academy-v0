@@ -4,7 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ImageIcon, Loader2Icon } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useDropzone, type FileRejection } from "react-dropzone";
 import { Controller, useForm } from "react-hook-form";
 
 import { Button } from "@/components/shadcnui/button";
@@ -60,8 +61,6 @@ const SchoolSettingsForm = ({
   const [logoError, setLogoError] = useState<string | null>(null);
   const [logoSuccess, setLogoSuccess] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     control,
@@ -135,37 +134,51 @@ const SchoolSettingsForm = ({
       return;
     }
     setLogoPath(result.logoPath);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
-    }
+    setPreviewUrl(null);
     setSelectedFile(null);
     setLogoSuccess("Logo updated.");
     router.refresh();
   };
 
   const displayLogo = previewUrl ?? logoPath;
-  const dropActive = dragOver && !uploading;
 
   const selectLogoFile = (next: File | null) => {
     setLogoError(null);
     setLogoSuccess(null);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
-    }
     setSelectedFile(next);
-    if (next) {
-      setPreviewUrl(URL.createObjectURL(next));
-    }
+    setPreviewUrl(next ? URL.createObjectURL(next) : null);
   };
 
-  const openFilePicker = () => {
-    if (uploading) {
-      return;
-    }
-    fileInputRef.current?.click();
-  };
+  const { getInputProps, getRootProps, isDragActive } = useDropzone({
+    accept: {
+      "image/jpeg": [],
+      "image/png": [],
+      "image/webp": [],
+    },
+    disabled: uploading,
+    maxFiles: 1,
+    maxSize: 2 * 1024 * 1024,
+    multiple: false,
+    onDropAccepted: (accepted: File[]) => {
+      selectLogoFile(accepted[0] ?? null);
+    },
+    onDropRejected: (rejections: FileRejection[]) => {
+      const code = rejections[0]?.errors[0]?.code ?? "";
+      setLogoSuccess(null);
+      const kept = selectedFile ? " Current selection kept." : "";
+      if (code === "file-too-large") {
+        setLogoError(`New file rejected: Logo must be 2MB or less.${kept}`);
+      } else if (code === "file-invalid-type") {
+        setLogoError(`New file rejected: Use JPG, PNG or WebP.${kept}`);
+      } else if (code === "too-many-files") {
+        setLogoError(`New file rejected: Choose a single image file.${kept}`);
+      } else {
+        setLogoError(`New file rejected: Could not read this image.${kept}`);
+      }
+    },
+  });
+
+  const dropActive = isDragActive && !uploading;
 
   return (
     <div className="flex flex-col gap-6">
@@ -194,38 +207,15 @@ const SchoolSettingsForm = ({
         </div>
         <div className="min-w-0">
           <div
-            role="button"
-            tabIndex={!uploading ? 0 : -1}
-            aria-label="Drag the new mark here or pick a file from the device"
-            aria-disabled={uploading}
-            onClick={openFilePicker}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                openFilePicker();
-              }
-            }}
-            onDragOver={(event) => {
-              if (uploading) {
-                return;
-              }
-              event.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(event) => {
-              if (uploading) {
-                return;
-              }
-              event.preventDefault();
-              setDragOver(false);
-              selectLogoFile(event.dataTransfer.files?.[0] ?? null);
-            }}
-            className={
-              dropActive ?
-                "border-primary bg-primary/10 cursor-pointer rounded-xl border-[1.5px] border-dashed px-5 py-7 text-center transition-colors"
-              : "border-border cursor-pointer rounded-xl border-[1.5px] border-dashed px-5 py-7 text-center transition-colors"
-            }>
+            {...getRootProps({
+              "aria-disabled": uploading,
+              "aria-label":
+                "Drag the new mark here or pick a file from the device",
+              className:
+                dropActive ?
+                  "border-primary bg-primary/10 cursor-pointer rounded-xl border-[1.5px] border-dashed px-5 py-7 text-center transition-colors"
+                : "border-border cursor-pointer rounded-xl border-[1.5px] border-dashed px-5 py-7 text-center transition-colors",
+            })}>
             <strong className="block text-[15px]">
               Drag the new mark here
             </strong>
@@ -236,18 +226,7 @@ const SchoolSettingsForm = ({
               Browse files
             </span>
           </div>
-          <input
-            ref={fileInputRef}
-            id="school-logo"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            hidden
-            disabled={uploading}
-            onChange={(event) => {
-              selectLogoFile(event.target.files?.[0] ?? null);
-              event.target.value = "";
-            }}
-          />
+          <input {...getInputProps({ id: "school-logo" })} />
           <div className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-3">
             <div className="text-muted-foreground min-w-0 flex-1 basis-36 truncate text-[13px]">
               {selectedFile ?

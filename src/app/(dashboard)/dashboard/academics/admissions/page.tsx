@@ -2,6 +2,13 @@ import type { Metadata } from "next";
 
 import { BreadcrumbTrail } from "@/components/Layout/Breadcrumbs";
 import PageHeader from "@/components/Layout/PageHeader";
+import { Button } from "@/components/shadcnui/button";
+import { Field, FieldLabel } from "@/components/shadcnui/field";
+import { Input } from "@/components/shadcnui/input";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/shadcnui/native-select";
 import AdmissionsDataTable from "@/components/Academics/AdmissionsDataTable";
 import { getAcademicsTrail } from "@/lib/dashboard-nav";
 import prisma from "@/lib/dbClient/prisma";
@@ -174,70 +181,66 @@ const AdmissionsPage = async ({ searchParams }: PageProps) => {
       <form
         className="flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-end"
         method="get">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">Search</span>
-          <input
-            className="border-input bg-background h-9 rounded-md border px-3"
+        <Field className="w-full sm:w-48">
+          <FieldLabel htmlFor="admissions-search">Search</FieldLabel>
+          <Input
             defaultValue={search}
+            id="admissions-search"
             maxLength={40}
             name="search"
             placeholder="Name or admission number"
             type="search"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">Status</span>
-          <select
-            className="border-input bg-background h-9 rounded-md border px-2"
+        </Field>
+        <Field className="w-full sm:w-48">
+          <FieldLabel htmlFor="admissions-status">Status</FieldLabel>
+          <NativeSelect
             defaultValue={status}
+            id="admissions-status"
             name="status">
-            <option value="all">All statuses</option>
+            <NativeSelectOption value="all">All statuses</NativeSelectOption>
             {statusOptions.map((option) => (
-              <option
+              <NativeSelectOption
                 key={option}
                 value={option}>
                 {option}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">Year</span>
-          <select
-            className="border-input bg-background h-9 rounded-md border px-2"
+          </NativeSelect>
+        </Field>
+        <Field className="w-full sm:w-48">
+          <FieldLabel htmlFor="admissions-year">Year</FieldLabel>
+          <NativeSelect
             defaultValue={yearParam || "all"}
+            id="admissions-year"
             name="yearId">
-            <option value="all">All years</option>
+            <NativeSelectOption value="all">All years</NativeSelectOption>
             {years.map((year) => (
-              <option
+              <NativeSelectOption
                 key={year.id}
                 value={year.id}>
                 {year.name}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">Class</span>
-          <select
-            className="border-input bg-background h-9 rounded-md border px-2"
+          </NativeSelect>
+        </Field>
+        <Field className="w-full sm:w-48">
+          <FieldLabel htmlFor="admissions-class">Class</FieldLabel>
+          <NativeSelect
             defaultValue={classParam || "all"}
+            id="admissions-class"
             name="classId">
-            <option value="all">All classes</option>
+            <NativeSelectOption value="all">All classes</NativeSelectOption>
             {classes.map((schoolClass) => (
-              <option
+              <NativeSelectOption
                 key={schoolClass.id}
                 value={schoolClass.id}>
                 {schoolClass.name}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
-        </label>
-        <button
-          className="bg-primary text-primary-foreground h-9 rounded-md px-4 text-sm font-medium"
-          type="submit">
-          Apply filters
-        </button>
+          </NativeSelect>
+        </Field>
+        <Button type="submit">Apply filters</Button>
       </form>
       <AdmissionsDataTable
         approvalRows={approvalRows}

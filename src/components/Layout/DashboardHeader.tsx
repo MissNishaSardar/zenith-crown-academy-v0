@@ -2,6 +2,7 @@
 
 import { Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
+import { Button } from "@/components/shadcnui/button";
 import ProfileMenu from "./ProfileMenu";
 import ThemeToggleButton from "./ThemeToggleButton";
 import { Breadcrumbs } from "./Breadcrumbs";
@@ -27,33 +28,27 @@ const DashboardHeader = ({
 }: DashboardHeaderProps) => (
   <header className="bg-sidebar/80 border-sidebar-border sticky top-0 z-40 h-16 shrink-0 border-b backdrop-blur-md">
     <div className="flex h-full w-full items-center gap-2 pr-[52px]">
-      <button
-        type="button"
+      <Button
         aria-label="Open menu"
         onClick={onOpenMobile}
-        className="text-muted-foreground hover:bg-accent hover:text-accent-foreground flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-r-md transition-colors md:hidden">
-        <Menu
-          aria-hidden="true"
-          className="size-5"
-        />
-      </button>
-      <button
+        size="icon"
         type="button"
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        variant="ghost"
+        className="shrink-0 rounded-r-md md:hidden">
+        <Menu aria-hidden="true" />
+      </Button>
+      <Button
         aria-expanded={!collapsed}
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         onClick={onToggle}
-        className="text-muted-foreground hover:bg-accent hover:text-accent-foreground hidden size-9 shrink-0 cursor-pointer items-center justify-center rounded-r-md transition-colors md:flex">
+        size="icon"
+        type="button"
+        variant="ghost"
+        className="hidden shrink-0 rounded-r-md md:inline-flex">
         {collapsed ?
-          <PanelLeftOpen
-            aria-hidden="true"
-            className="size-5"
-          />
-        : <PanelLeftClose
-            aria-hidden="true"
-            className="size-5"
-          />
-        }
-      </button>
+          <PanelLeftOpen aria-hidden="true" />
+        : <PanelLeftClose aria-hidden="true" />}
+      </Button>
       {/* pl-2 plus toggle 36 and row gap 8 sets the 52px crumb offset that main padding mirrors. */}
       <div className="flex min-w-0 flex-1 items-center pl-2">
         <Breadcrumbs />

@@ -16,6 +16,12 @@ import {
 } from "@/lib/dashboard-nav";
 import { FALLBACK_SCHOOL_NAME } from "@/lib/school-branding-constants";
 import { cn } from "@/lib/utils";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/shadcnui/collapsible";
+import { Separator } from "@/components/shadcnui/separator";
 
 type DashboardSidebarProps = {
   collapsed: boolean;
@@ -93,10 +99,21 @@ const SidebarNav = ({
 }) => {
   const pathname = usePathname();
   const [userExpanded, setUserExpanded] = useState(true);
+  const [expandedForPathname, setExpandedForPathname] = useState(pathname);
   const pathnameIsAcademics = isAcademicsPath(pathname);
   const standaloneLinks = links.filter((link) => !isAcademicsHref(link.href));
   const academicsLinks = links.filter((link) => isAcademicsHref(link.href));
-  const groupOpen = pathnameIsAcademics ? true : userExpanded;
+  // Auto-expand when navigating to an academics page so the active link is
+  // visible, but never force it open: the toggle must keep working while
+  // staying on the same page. State is adjusted during render on pathname
+  // change instead of in an effect to avoid a cascading render.
+  if (pathname !== expandedForPathname) {
+    setExpandedForPathname(pathname);
+    if (pathnameIsAcademics) {
+      setUserExpanded(true);
+    }
+  }
+  const groupOpen = userExpanded;
 
   if (collapsed) {
     const landingActive = pathname === ACADEMICS_OVERVIEW_HREF;
@@ -187,52 +204,48 @@ const SidebarNav = ({
         );
       })}
       {academicsLinks.length > 0 ?
-        <div className="flex w-full flex-col gap-1">
-          <div
-            className={cn(
-              "flex w-full items-center gap-1 rounded-md transition-colors",
-              pathnameIsAcademics ?
-                "bg-secondary text-secondary-foreground"
-              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-            )}>
-            <Link
-              href={dashboardRoute(ACADEMICS_OVERVIEW_HREF)}
-              aria-current={
-                pathname === ACADEMICS_OVERVIEW_HREF ? "page" : undefined
-              }
-              aria-label={ACADEMICS_LABEL}
-              onClick={onNavigate}
-              className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm font-medium">
-              <BookOpen
-                aria-hidden="true"
-                className="size-5 shrink-0"
-              />
-              <span className="flex-1 truncate text-left">
-                {ACADEMICS_LABEL}
-              </span>
-            </Link>
-            <button
-              type="button"
-              aria-expanded={groupOpen}
-              aria-controls="academics-nav-group"
-              aria-label="Toggle Academics section"
-              onClick={() => setUserExpanded((previous) => !previous)}
-              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors">
-              <ChevronDown
-                aria-hidden="true"
-                className={cn(
-                  "size-4 shrink-0 transition-transform",
-                  groupOpen && "rotate-180",
-                )}
-              />
-            </button>
-          </div>
-          {groupOpen ?
+        <>
+          <Separator className="my-1" />
+          <Collapsible
+            open={groupOpen}
+            onOpenChange={setUserExpanded}
+            className="flex w-full flex-col gap-1">
             <div
-              id="academics-nav-group"
-              role="group"
-              aria-label={ACADEMICS_LABEL}
-              className="flex w-full flex-col gap-1 pl-4">
+              className={cn(
+                "flex w-full items-center gap-1 rounded-md transition-colors",
+                pathnameIsAcademics ?
+                  "bg-secondary text-secondary-foreground"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+              )}>
+              <Link
+                href={dashboardRoute(ACADEMICS_OVERVIEW_HREF)}
+                aria-current={
+                  pathname === ACADEMICS_OVERVIEW_HREF ? "page" : undefined
+                }
+                aria-label={ACADEMICS_LABEL}
+                onClick={onNavigate}
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm font-medium">
+                <BookOpen
+                  aria-hidden="true"
+                  className="size-5 shrink-0"
+                />
+                <span className="flex-1 truncate text-left">
+                  {ACADEMICS_LABEL}
+                </span>
+              </Link>
+              <CollapsibleTrigger
+                aria-label="Toggle Academics section"
+                className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors">
+                <ChevronDown
+                  aria-hidden="true"
+                  className={cn(
+                    "size-4 shrink-0 transition-transform",
+                    groupOpen && "rotate-180",
+                  )}
+                />
+              </CollapsibleTrigger>
+            </div>
+            <CollapsibleContent className="flex w-full flex-col gap-1 pl-4">
               {academicsLinks.map((link) => {
                 const Icon = link.icon;
                 const isActive = pathname === link.href;
@@ -257,9 +270,9 @@ const SidebarNav = ({
                   </Link>
                 );
               })}
-            </div>
-          : null}
-        </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </>
       : null}
     </nav>
   );

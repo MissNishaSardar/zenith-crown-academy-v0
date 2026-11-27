@@ -7,6 +7,7 @@ import type { Route } from "next";
 import { getCoreRowModel, useLegacyTable } from "@tanstack/react-table/legacy";
 import { legacyCreateColumnHelper } from "@tanstack/react-table/legacy";
 import { Button } from "@/components/shadcnui/button";
+import { Card, CardContent } from "@/components/shadcnui/card";
 import DataTable, {
   DataTablePagination,
   DataTableSortButton,
@@ -143,29 +144,31 @@ const SubjectsList = ({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-end sm:gap-4">
-        <Field className="flex-1">
-          <FieldLabel htmlFor="subjects-search">Search subjects</FieldLabel>
-          <Input
-            autoComplete="off"
-            id="subjects-search"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Code or name like ENG"
-            type="search"
-            value={search}
-          />
-        </Field>
-        <Button
-          disabled={search.trim() === ""}
-          onClick={() => {
-            setSearch("");
-            router.replace(`${pathname}?page=1` as Route);
-          }}
-          type="button"
-          variant="outline">
-          Clear
-        </Button>
-      </div>
+      <Card>
+        <CardContent className="sm:flex-row sm:items-end sm:gap-4">
+          <Field className="flex-1">
+            <FieldLabel htmlFor="subjects-search">Search subjects</FieldLabel>
+            <Input
+              autoComplete="off"
+              id="subjects-search"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Code or name like ENG"
+              type="search"
+              value={search}
+            />
+          </Field>
+          <Button
+            disabled={search.trim() === ""}
+            onClick={() => {
+              setSearch("");
+              router.replace(`${pathname}?page=1` as Route);
+            }}
+            type="button"
+            variant="outline">
+            Clear
+          </Button>
+        </CardContent>
+      </Card>
       <div className="overflow-hidden rounded-xl border">
         <DataTable
           emptyMessage="No subjects match these filters."

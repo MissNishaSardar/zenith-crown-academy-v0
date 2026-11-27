@@ -7,6 +7,8 @@ import type { Route } from "next";
 import { getCoreRowModel, useLegacyTable } from "@tanstack/react-table/legacy";
 import { legacyCreateColumnHelper } from "@tanstack/react-table/legacy";
 import { Button } from "@/components/shadcnui/button";
+import { Badge } from "@/components/shadcnui/badge";
+import { Card, CardContent } from "@/components/shadcnui/card";
 import DataTable, {
   DataTablePagination,
   DataTableSortButton,
@@ -68,9 +70,11 @@ const calendarColumns = columnHelper.columns([
   }),
   columnHelper.accessor("yearName", {
     cell: ({ getValue }) => (
-      <span className="bg-secondary text-secondary-foreground w-fit rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap">
+      <Badge
+        variant="secondary"
+        className="w-fit whitespace-nowrap">
         {getValue()}
-      </span>
+      </Badge>
     ),
     header: "Year",
   }),
@@ -173,79 +177,83 @@ const CalendarList = ({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-end sm:gap-4">
-        <Field className="flex-1">
-          <FieldLabel htmlFor="calendar-search">Search notes</FieldLabel>
-          <Input
-            autoComplete="off"
-            id="calendar-search"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Note like Diwali"
-            type="search"
-            value={search}
-          />
-        </Field>
-        <Field className="sm:w-auto">
-          <FieldLabel htmlFor="calendar-year">Year</FieldLabel>
-          <NativeSelect
-            className="w-full sm:w-44"
-            id="calendar-year"
-            onChange={(event) => {
-              const params = new URLSearchParams();
-              if (search.trim()) params.set("search", search.trim());
-              if (event.target.value !== "all")
-                params.set("yearId", event.target.value);
-              if (type !== "all") params.set("type", type);
-              params.set("page", "1");
-              router.replace(`${pathname}?${params.toString()}` as Route);
+      <Card>
+        <CardContent className="sm:flex-row sm:items-end sm:gap-4">
+          <Field className="flex-1">
+            <FieldLabel htmlFor="calendar-search">Search notes</FieldLabel>
+            <Input
+              autoComplete="off"
+              id="calendar-search"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Note like Diwali"
+              type="search"
+              value={search}
+            />
+          </Field>
+          <Field className="sm:w-auto">
+            <FieldLabel htmlFor="calendar-year">Year</FieldLabel>
+            <NativeSelect
+              className="w-full sm:w-44"
+              id="calendar-year"
+              onChange={(event) => {
+                const params = new URLSearchParams();
+                if (search.trim()) params.set("search", search.trim());
+                if (event.target.value !== "all")
+                  params.set("yearId", event.target.value);
+                if (type !== "all") params.set("type", type);
+                params.set("page", "1");
+                router.replace(`${pathname}?${params.toString()}` as Route);
+              }}
+              value={yearId}>
+              <NativeSelectOption value="all">All years</NativeSelectOption>
+              {years.map((option) => (
+                <NativeSelectOption
+                  key={option.id}
+                  value={option.id}>
+                  {option.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field className="sm:w-auto">
+            <FieldLabel htmlFor="calendar-type">Type</FieldLabel>
+            <NativeSelect
+              className="w-full sm:w-44"
+              id="calendar-type"
+              onChange={(event) => {
+                const params = new URLSearchParams();
+                if (search.trim()) params.set("search", search.trim());
+                if (yearId !== "all") params.set("yearId", yearId);
+                if (event.target.value !== "all")
+                  params.set("type", event.target.value);
+                params.set("page", "1");
+                router.replace(`${pathname}?${params.toString()}` as Route);
+              }}
+              value={type}>
+              <NativeSelectOption value="all">All types</NativeSelectOption>
+              {types.map((option) => (
+                <NativeSelectOption
+                  key={option.value}
+                  value={option.value}>
+                  {option.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Button
+            disabled={
+              search.trim() === "" && yearId === "all" && type === "all"
+            }
+            onClick={() => {
+              setSearch("");
+              router.replace(`${pathname}?page=1` as Route);
             }}
-            value={yearId}>
-            <NativeSelectOption value="all">All years</NativeSelectOption>
-            {years.map((option) => (
-              <NativeSelectOption
-                key={option.id}
-                value={option.id}>
-                {option.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field className="sm:w-auto">
-          <FieldLabel htmlFor="calendar-type">Type</FieldLabel>
-          <NativeSelect
-            className="w-full sm:w-44"
-            id="calendar-type"
-            onChange={(event) => {
-              const params = new URLSearchParams();
-              if (search.trim()) params.set("search", search.trim());
-              if (yearId !== "all") params.set("yearId", yearId);
-              if (event.target.value !== "all")
-                params.set("type", event.target.value);
-              params.set("page", "1");
-              router.replace(`${pathname}?${params.toString()}` as Route);
-            }}
-            value={type}>
-            <NativeSelectOption value="all">All types</NativeSelectOption>
-            {types.map((option) => (
-              <NativeSelectOption
-                key={option.value}
-                value={option.value}>
-                {option.label}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Button
-          disabled={search.trim() === "" && yearId === "all" && type === "all"}
-          onClick={() => {
-            setSearch("");
-            router.replace(`${pathname}?page=1` as Route);
-          }}
-          type="button"
-          variant="outline">
-          Clear
-        </Button>
-      </div>
+            type="button"
+            variant="outline">
+            Clear
+          </Button>
+        </CardContent>
+      </Card>
       <div className="overflow-hidden rounded-xl border">
         <DataTable
           emptyMessage="No calendar days match these filters."

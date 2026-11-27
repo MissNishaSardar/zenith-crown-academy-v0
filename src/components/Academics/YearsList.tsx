@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import type { Route } from "next";
 import { getCoreRowModel, useLegacyTable } from "@tanstack/react-table/legacy";
 import { Button } from "@/components/shadcnui/button";
+import { Badge } from "@/components/shadcnui/badge";
+import { Card, CardContent } from "@/components/shadcnui/card";
 import DataTable, {
   DataTablePagination,
   DataTableSortButton,
@@ -52,9 +54,11 @@ const yearsColumns = columnHelper.columns([
   }),
   columnHelper.accessor("status", {
     cell: ({ getValue }) => (
-      <span className="bg-secondary text-secondary-foreground w-fit rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap">
+      <Badge
+        variant="secondary"
+        className="w-fit whitespace-nowrap">
         {getValue()}
-      </span>
+      </Badge>
     ),
     header: ({ column }) => (
       <DataTableSortButton
@@ -167,62 +171,51 @@ const YearsList = ({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-end sm:gap-4">
-        <Field className="flex-1">
-          <FieldLabel htmlFor="years-search">Search years</FieldLabel>
-          <Input
-            autoComplete="off"
-            id="years-search"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Year name like 2025-2026"
-            type="search"
-            value={search}
-          />
-        </Field>
-        <Field className="sm:w-auto">
-          <FieldLabel htmlFor="years-status">Status</FieldLabel>
-          <NativeSelect
-            className="w-full sm:w-40"
-            id="years-status"
-            onChange={(event) => {
-              const params = new URLSearchParams();
-              if (search.trim()) params.set("search", search.trim());
-              if (event.target.value !== "all")
-                params.set("status", event.target.value);
-              params.set("page", "1");
-              router.replace(`${pathname}?${params.toString()}` as Route);
+      <Card>
+        <CardContent className="sm:flex-row sm:items-end sm:gap-4">
+          <Field className="flex-1">
+            <FieldLabel htmlFor="years-search">Search years</FieldLabel>
+            <Input
+              autoComplete="off"
+              id="years-search"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Year name like 2025-2026"
+              type="search"
+              value={search}
+            />
+          </Field>
+          <Field className="sm:w-auto">
+            <FieldLabel htmlFor="years-status">Status</FieldLabel>
+            <NativeSelect
+              className="w-full sm:w-40"
+              id="years-status"
+              onChange={(event) => {
+                const params = new URLSearchParams();
+                if (search.trim()) params.set("search", search.trim());
+                if (event.target.value !== "all")
+                  params.set("status", event.target.value);
+                params.set("page", "1");
+                router.replace(`${pathname}?${params.toString()}` as Route);
+              }}
+              value={status}>
+              <NativeSelectOption value="all">All</NativeSelectOption>
+              <NativeSelectOption value="UPCOMING">Upcoming</NativeSelectOption>
+              <NativeSelectOption value="CURRENT">Current</NativeSelectOption>
+              <NativeSelectOption value="CLOSED">Closed</NativeSelectOption>
+            </NativeSelect>
+          </Field>
+          <Button
+            disabled={search.trim() === "" && status === "all"}
+            onClick={() => {
+              setSearch("");
+              router.replace(`${pathname}?page=1` as Route);
             }}
-            value={status}>
-            <NativeSelectOption value="all">All</NativeSelectOption>
-            <NativeSelectOption value="UPCOMING">Upcoming</NativeSelectOption>
-            <NativeSelectOption value="CURRENT">Current</NativeSelectOption>
-            <NativeSelectOption value="CLOSED">Closed</NativeSelectOption>
-          </NativeSelect>
-        </Field>
-        <Button
-          disabled={search.trim() === "" && status === "all"}
-          onClick={() => {
-            setSearch("");
-            router.replace(`${pathname}?page=1` as Route);
-          }}
-          type="button"
-          variant="outline">
-          Clear
-        </Button>
-      </div>
-      <div className="rounded-xl border px-4 py-3">
-        <p className="text-muted-foreground text-sm">
-          Year structure clone ships in H0 and requires approval. No direct copy
-          runs from this list.
-        </p>
-        <Button
-          disabled
-          title="Clone ships in H0"
-          type="button"
-          variant="outline">
-          Clone structure
-        </Button>
-      </div>
+            type="button"
+            variant="outline">
+            Clear
+          </Button>
+        </CardContent>
+      </Card>
       <div className="overflow-hidden rounded-xl border">
         <DataTable
           emptyMessage="No years match these filters."

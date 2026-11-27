@@ -18,6 +18,12 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/shadcnui/badge";
 import { Button } from "@/components/shadcnui/button";
 import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/shadcnui/card";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -27,6 +33,7 @@ import {
 } from "@/components/shadcnui/dialog";
 import { withMinimumLoad } from "@/lib/auth/withMinimumLoad";
 import { formatDateTimeDisplay } from "@/lib/formatDate";
+import { Progress } from "@/components/shadcnui/progress";
 import type { HealthSnapshot } from "@/server/system/health";
 
 type SystemHealthViewProps = {
@@ -80,11 +87,9 @@ const formatUptime = (totalSeconds: number): string => {
   return restHours > 0 ? `${days} days ${restHours} hours` : `${days} days`;
 };
 
-const formatCheckedAt = (iso: string): string => formatDateTimeDisplay(iso);
-
 type MemoryState = {
   badge: ReactNode;
-  barClass: string;
+  indicatorClass: string;
   percent: number | null;
 };
 
@@ -96,14 +101,14 @@ const getMemoryState = (
   if (!ok) {
     return {
       badge: <Badge variant="destructive">Not measured</Badge>,
-      barClass: "bg-destructive",
+      indicatorClass: "[&_[data-slot=progress-indicator]]:bg-destructive",
       percent: null,
     };
   }
   if (used === null || total === null || total <= 0) {
     return {
       badge: <Badge variant="destructive">Not measured</Badge>,
-      barClass: "bg-destructive",
+      indicatorClass: "[&_[data-slot=progress-indicator]]:bg-destructive",
       percent: null,
     };
   }
@@ -111,7 +116,7 @@ const getMemoryState = (
   if (percent >= 90) {
     return {
       badge: <Badge variant="destructive">Critical</Badge>,
-      barClass: "bg-destructive",
+      indicatorClass: "[&_[data-slot=progress-indicator]]:bg-destructive",
       percent,
     };
   }
@@ -122,7 +127,7 @@ const getMemoryState = (
           High
         </Badge>
       ),
-      barClass: "bg-amber-500",
+      indicatorClass: "[&_[data-slot=progress-indicator]]:bg-amber-500",
       percent,
     };
   }
@@ -132,7 +137,7 @@ const getMemoryState = (
         Normal
       </Badge>
     ),
-    barClass: "bg-emerald-500",
+    indicatorClass: "[&_[data-slot=progress-indicator]]:bg-emerald-500",
     percent,
   };
 };
@@ -192,28 +197,22 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
     setIsRefreshing(false);
   };
 
-  const checks = [
-    snapshot.database.ok,
-    snapshot.storage.ok,
-    snapshot.env.ok,
-    snapshot.runtime.ok,
-  ];
-  const workingCount = checks.filter(Boolean).length;
   const isOk = snapshot.status === "ok";
-  const checkedDisplay = formatCheckedAt(snapshot.timestamp);
+  const checkedDisplay = formatDateTimeDisplay(snapshot.timestamp);
   const memory = getMemoryState(
     snapshot.runtime.memoryMb,
     snapshot.runtime.memoryTotalMb,
     snapshot.runtime.ok,
   );
 
-  const StatusHeroIcon = isOk ? CircleCheckIcon : TriangleAlertIcon;
+  const StatusIcon = isOk ? CircleCheckIcon : TriangleAlertIcon;
 
   return (
     <div className="flex flex-col gap-4">
-      <section
+      <Card
         aria-label="Overall system status"
-        className="bg-card flex flex-col gap-4 rounded-xl border p-4 sm:p-5">
+        className="flex-col gap-4 p-4 sm:p-5"
+        role="region">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3">
             <span
@@ -223,7 +222,7 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
                   "flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                 : "bg-destructive/10 text-destructive flex size-10 shrink-0 items-center justify-center rounded-full"
               }>
-              <StatusHeroIcon className="size-5" />
+              <StatusIcon className="size-5" />
             </span>
             <div className="flex min-w-0 flex-col gap-1">
               <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
@@ -235,17 +234,9 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
                 : <Badge variant="destructive">Needs attention</Badge>}
                 <Badge variant="outline">Version {snapshot.version}</Badge>
               </div>
-              <h2 className="text-foreground text-lg font-semibold text-balance">
+              <CardTitle className="text-foreground text-lg font-semibold text-balance">
                 {isOk ? "Everything looks good" : "Something needs attention"}
-              </h2>
-              <p
-                aria-live="polite"
-                className="text-muted-foreground text-sm text-pretty">
-                {isOk ?
-                  "All 4 systems are working. Teaching and office work can continue."
-                : `${workingCount} of 4 systems are working. Read the cards below to see what to check first.`
-                }
-              </p>
+              </CardTitle>
               <p
                 className="text-muted-foreground text-[13px] leading-relaxed"
                 suppressHydrationWarning>
@@ -275,223 +266,236 @@ const SystemHealthView = ({ snapshot }: SystemHealthViewProps) => {
             }
           </Button>
         </div>
-      </section>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <section
+        <Card
           aria-label="Classes and logins"
-          className="bg-card flex h-60 flex-col gap-3 rounded-xl border p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span
-                aria-hidden="true"
-                className="bg-muted text-foreground flex size-8 items-center justify-center rounded-lg">
-                <DatabaseIcon className="size-4" />
-              </span>
-              <div className="flex flex-col">
-                <h3 className="font-medium">Classes and logins</h3>
-                <p className="text-muted-foreground text-xs">
-                  Student records and sign in
-                </p>
+          className="h-60 flex-col gap-3 p-4"
+          role="region">
+          <CardHeader className="p-0">
+            <div className="flex w-full items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="bg-muted text-foreground flex size-8 items-center justify-center rounded-lg">
+                  <DatabaseIcon className="size-4" />
+                </span>
+                <div className="flex flex-col">
+                  <CardTitle>Classes and logins</CardTitle>
+                  <p className="text-muted-foreground text-xs">
+                    Student records and sign in
+                  </p>
+                </div>
               </div>
+              {snapshot.database.ok ?
+                <Badge>Working</Badge>
+              : <Badge variant="destructive">Needs attention</Badge>}
             </div>
-            {snapshot.database.ok ?
-              <Badge>Working</Badge>
-            : <Badge variant="destructive">Needs attention</Badge>}
-          </div>
-          <dl className="flex flex-1 flex-col gap-1 text-sm">
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-muted-foreground">Speed</dt>
-              <dd className="text-foreground font-medium">
-                {formatSpeed(snapshot.database.latencyMs)}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-muted-foreground">People records</dt>
-              <dd className="text-foreground font-medium">
-                {formatCount(snapshot.database.userCount)}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-muted-foreground">Active logins</dt>
-              <dd className="text-foreground font-medium">
-                {formatCount(snapshot.database.sessionCount)}
-              </dd>
-            </div>
-          </dl>
-          <div className="mt-auto pt-1">
-            <HealthDetailsDialog
-              title="Classes and logins"
-              subtitle="Student records and sign in"
-              meaning="When this is working, everyone can sign in and open class pages."
-            />
-          </div>
-        </section>
-
-        <section
-          aria-label="Files and uploads"
-          className="bg-card flex h-60 flex-col gap-3 rounded-xl border p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span
-                aria-hidden="true"
-                className="bg-muted text-foreground flex size-8 items-center justify-center rounded-lg">
-                <HardDriveIcon className="size-4" />
-              </span>
-              <div className="flex flex-col">
-                <h3 className="font-medium">Files and uploads</h3>
-                <p className="text-muted-foreground text-xs">
-                  Worksheets and images
-                </p>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col gap-1 p-0">
+            <dl className="flex flex-1 flex-col gap-1 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">Speed</dt>
+                <dd className="text-foreground font-medium">
+                  {formatSpeed(snapshot.database.latencyMs)}
+                </dd>
               </div>
-            </div>
-            {snapshot.storage.ok ?
-              <Badge>Ready</Badge>
-            : <Badge variant="destructive">Not ready</Badge>}
-          </div>
-          <dl className="flex flex-1 flex-col gap-1 text-sm">
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-muted-foreground">Upload space</dt>
-              <dd className="text-foreground font-medium">
-                {snapshot.storage.ok ?
-                  "Ready to save files"
-                : "Cannot save files"}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-muted-foreground">Folder</dt>
-              <dd className="text-foreground font-medium">Public uploads</dd>
-            </div>
-          </dl>
-          <div className="mt-auto pt-1">
-            <HealthDetailsDialog
-              title="Files and uploads"
-              subtitle="Worksheets and images"
-              meaning="When this is ready, file uploads will save without errors."
-            />
-          </div>
-        </section>
-
-        <section
-          aria-label="Setup and keys"
-          className="bg-card flex h-60 flex-col gap-3 rounded-xl border p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span
-                aria-hidden="true"
-                className="bg-muted text-foreground flex size-8 items-center justify-center rounded-lg">
-                <ShieldCheckIcon className="size-4" />
-              </span>
-              <div className="flex flex-col">
-                <h3 className="font-medium">Setup and keys</h3>
-                <p className="text-muted-foreground text-xs">
-                  Private app settings
-                </p>
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">People records</dt>
+                <dd className="text-foreground font-medium">
+                  {formatCount(snapshot.database.userCount)}
+                </dd>
               </div>
-            </div>
-            {snapshot.env.ok ?
-              <Badge>Complete</Badge>
-            : <Badge variant="destructive">Missing keys</Badge>}
-          </div>
-          <dl className="flex flex-1 flex-col gap-1 text-sm">
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-muted-foreground">Main database</dt>
-              <dd>
-                {snapshot.env.databaseUrlSet ?
-                  <Badge variant="outline">Set</Badge>
-                : <Badge variant="destructive">Missing</Badge>}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-muted-foreground">Login address</dt>
-              <dd>
-                {snapshot.env.betterAuthUrlSet ?
-                  <Badge variant="outline">Set</Badge>
-                : <Badge variant="destructive">Missing</Badge>}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-muted-foreground">Login secret</dt>
-              <dd>
-                {snapshot.env.betterAuthSecretSet ?
-                  <Badge variant="outline">Set</Badge>
-                : <Badge variant="destructive">Missing</Badge>}
-              </dd>
-            </div>
-          </dl>
-          <div className="mt-auto pt-1">
-            <HealthDetailsDialog
-              title="Setup and keys"
-              subtitle="Private app settings"
-              meaning="Keys stay hidden. This page only shows if each key is present."
-            />
-          </div>
-        </section>
-
-        <section
-          aria-label="Server awake time"
-          className="bg-card flex h-60 flex-col gap-3 rounded-xl border p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span
-                aria-hidden="true"
-                className="bg-muted text-foreground flex size-8 items-center justify-center rounded-lg">
-                <ActivityIcon className="size-4" />
-              </span>
-              <div className="flex flex-col">
-                <h3 className="font-medium">Server awake time</h3>
-                <p className="text-muted-foreground text-xs">
-                  Memory and run time
-                </p>
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">Active logins</dt>
+                <dd className="text-foreground font-medium">
+                  {formatCount(snapshot.database.sessionCount)}
+                </dd>
               </div>
-            </div>
-            {memory.badge}
-          </div>
-          <dl className="flex flex-1 flex-col gap-1 text-sm">
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-muted-foreground">Awake for</dt>
-              <dd className="text-foreground font-medium">
-                {formatUptime(snapshot.runtime.uptimeSec)}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-muted-foreground">Memory</dt>
-              <dd className="text-foreground font-medium">
-                {formatMemory(
-                  snapshot.runtime.memoryMb,
-                  snapshot.runtime.memoryTotalMb,
-                )}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-muted-foreground">Status</dt>
-              <dd className="text-foreground font-medium">
-                {snapshot.runtime.ok ? "Running normally" : "Not available"}
-              </dd>
-            </div>
-          </dl>
-          {memory.percent !== null ?
-            <div
-              aria-label={`Memory use ${memory.percent} percent`}
-              className="bg-muted h-1.5 w-full overflow-hidden rounded-full"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={memory.percent}>
-              <div
-                className={`h-full rounded-full ${memory.barClass}`}
-                style={{ width: `${memory.percent}%` }}
+            </dl>
+            <div className="mt-auto pt-1">
+              <HealthDetailsDialog
+                title="Classes and logins"
+                subtitle="Student records and sign in"
+                meaning="When this is working, everyone can sign in and open class pages."
               />
             </div>
-          : null}
-          <div className="mt-auto pt-1">
-            <HealthDetailsDialog
-              title="Server awake time"
-              subtitle="Memory and run time"
-              meaning="A short awake time after an update is normal. Memory changes through the day."
-            />
-          </div>
-        </section>
+          </CardContent>
+        </Card>
+
+        <Card
+          aria-label="Files and uploads"
+          className="h-60 flex-col gap-3 p-4"
+          role="region">
+          <CardHeader className="p-0">
+            <div className="flex w-full items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="bg-muted text-foreground flex size-8 items-center justify-center rounded-lg">
+                  <HardDriveIcon className="size-4" />
+                </span>
+                <div className="flex flex-col">
+                  <CardTitle>Files and uploads</CardTitle>
+                  <p className="text-muted-foreground text-xs">
+                    Worksheets and images
+                  </p>
+                </div>
+              </div>
+              {snapshot.storage.ok ?
+                <Badge>Ready</Badge>
+              : <Badge variant="destructive">Not ready</Badge>}
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col gap-1 p-0">
+            <dl className="flex flex-1 flex-col gap-1 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">Upload space</dt>
+                <dd className="text-foreground font-medium">
+                  {snapshot.storage.ok ?
+                    "Ready to save files"
+                  : "Cannot save files"}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">Folder</dt>
+                <dd className="text-foreground font-medium">Public uploads</dd>
+              </div>
+            </dl>
+            <div className="mt-auto pt-1">
+              <HealthDetailsDialog
+                title="Files and uploads"
+                subtitle="Worksheets and images"
+                meaning="When this is ready, file uploads will save without errors."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
+          aria-label="Setup and keys"
+          className="h-60 flex-col gap-3 p-4"
+          role="region">
+          <CardHeader className="p-0">
+            <div className="flex w-full items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="bg-muted text-foreground flex size-8 items-center justify-center rounded-lg">
+                  <ShieldCheckIcon className="size-4" />
+                </span>
+                <div className="flex flex-col">
+                  <CardTitle>Setup and keys</CardTitle>
+                  <p className="text-muted-foreground text-xs">
+                    Private app settings
+                  </p>
+                </div>
+              </div>
+              {snapshot.env.ok ?
+                <Badge>Complete</Badge>
+              : <Badge variant="destructive">Missing keys</Badge>}
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col gap-1 p-0">
+            <dl className="flex flex-1 flex-col gap-1 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">Main database</dt>
+                <dd>
+                  {snapshot.env.databaseUrlSet ?
+                    <Badge variant="outline">Set</Badge>
+                  : <Badge variant="destructive">Missing</Badge>}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">Login address</dt>
+                <dd>
+                  {snapshot.env.betterAuthUrlSet ?
+                    <Badge variant="outline">Set</Badge>
+                  : <Badge variant="destructive">Missing</Badge>}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">Login secret</dt>
+                <dd>
+                  {snapshot.env.betterAuthSecretSet ?
+                    <Badge variant="outline">Set</Badge>
+                  : <Badge variant="destructive">Missing</Badge>}
+                </dd>
+              </div>
+            </dl>
+            <div className="mt-auto pt-1">
+              <HealthDetailsDialog
+                title="Setup and keys"
+                subtitle="Private app settings"
+                meaning="Keys stay hidden. This page only shows if each key is present."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
+          aria-label="Server awake time"
+          className="h-60 flex-col gap-3 p-4"
+          role="region">
+          <CardHeader className="p-0">
+            <div className="flex w-full items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="bg-muted text-foreground flex size-8 items-center justify-center rounded-lg">
+                  <ActivityIcon className="size-4" />
+                </span>
+                <div className="flex flex-col">
+                  <CardTitle>Server awake time</CardTitle>
+                  <p className="text-muted-foreground text-xs">
+                    Memory and run time
+                  </p>
+                </div>
+              </div>
+              {memory.badge}
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col gap-1 p-0">
+            <dl className="flex flex-1 flex-col gap-1 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">Awake for</dt>
+                <dd className="text-foreground font-medium">
+                  {formatUptime(snapshot.runtime.uptimeSec)}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">Memory</dt>
+                <dd className="text-foreground font-medium">
+                  {formatMemory(
+                    snapshot.runtime.memoryMb,
+                    snapshot.runtime.memoryTotalMb,
+                  )}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">Status</dt>
+                <dd className="text-foreground font-medium">
+                  {snapshot.runtime.ok ? "Running normally" : "Not available"}
+                </dd>
+              </div>
+            </dl>
+            {memory.percent !== null ?
+              <Progress
+                aria-label={`Memory use ${memory.percent} percent`}
+                className={memory.indicatorClass}
+                value={memory.percent}
+              />
+            : null}
+            <div className="mt-auto pt-1">
+              <HealthDetailsDialog
+                title="Server awake time"
+                subtitle="Memory and run time"
+                meaning="A short awake time after an update is normal. Memory changes through the day."
+              />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

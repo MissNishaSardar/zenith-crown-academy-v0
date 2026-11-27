@@ -6,6 +6,19 @@ import { useState } from "react";
 import type { Route } from "next";
 import { Badge } from "@/components/shadcnui/badge";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/shadcnui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/shadcnui/collapsible";
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/shadcnui/empty";
+import {
   formatAuditValue,
   getAuditFieldLabel,
   getAuditSummary,
@@ -140,101 +153,108 @@ const AdministratorOverview = ({
             "Open system health, status all working"
           : "Open system health, status needs attention"
         }
-        className="bg-card hover:border-primary/40 flex flex-col gap-2 rounded-xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between"
         href={"/dashboard/administrator/system" as Route}>
-        <div className="flex items-center gap-2">
-          {isOk ?
-            <Badge>All working</Badge>
-          : <Badge variant="destructive">Needs attention</Badge>}
-          <Badge variant="outline">Version {stats.systemVersion}</Badge>
-        </div>
-        <span className="text-primary text-sm font-medium underline-offset-4 hover:underline">
-          Open system health
-        </span>
+        <Card className="hover:border-primary/40 flex-col gap-2 p-4 transition-colors sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            {isOk ?
+              <Badge>All working</Badge>
+            : <Badge variant="destructive">Needs attention</Badge>}
+            <Badge variant="outline">Version {stats.systemVersion}</Badge>
+          </div>
+          <span className="text-primary text-sm font-medium underline-offset-4 hover:underline">
+            Open system health
+          </span>
+        </Card>
       </Link>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {buildStatCards(stats).map((item) => (
           <Link
             aria-label={`${item.label}: ${item.value}. ${item.trend}`}
-            className={
-              item.alert ?
-                "bg-card hover:border-destructive/50 border-destructive/40 flex flex-col gap-1 rounded-xl border p-4 transition-colors"
-              : "bg-card hover:border-primary/40 flex flex-col gap-1 rounded-xl border p-4 transition-colors"
-            }
             href={item.href}
             key={item.label}>
-            <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              {item.label}
-            </p>
-            <p className="text-foreground text-2xl font-bold tracking-tight">
-              {item.value}
-            </p>
-            <p className="text-muted-foreground text-xs">{item.sub}</p>
-            <p className="text-muted-foreground text-xs font-medium">
-              {item.trend}
-            </p>
-            {item.alertNote ?
-              <p className="text-destructive text-xs font-semibold">
-                {item.alertNote}
-              </p>
-            : null}
+            <Card
+              className={
+                item.alert ?
+                  "border-destructive/40 hover:border-destructive/50 flex-col gap-1 p-4 transition-colors"
+                : "hover:border-primary/40 flex-col gap-1 p-4 transition-colors"
+              }>
+              <CardHeader className="p-0">
+                <CardDescription className="text-xs font-medium tracking-wide uppercase">
+                  {item.label}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-1 p-0">
+                <p className="text-foreground text-2xl font-bold tracking-tight">
+                  {item.value}
+                </p>
+                <p className="text-muted-foreground text-xs">{item.sub}</p>
+                <p className="text-muted-foreground text-xs font-medium">
+                  {item.trend}
+                </p>
+                {item.alertNote ?
+                  <p className="text-destructive text-xs font-semibold">
+                    {item.alertNote}
+                  </p>
+                : null}
+              </CardContent>
+            </Card>
           </Link>
         ))}
       </div>
 
-      <section
-        aria-label="Recent admin activity"
-        className="bg-card flex flex-col gap-2 rounded-xl border p-4">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-medium">Recent admin activity</h2>
-          <Link
-            href={"/dashboard/administrator/audit" as Route}
-            className="text-primary text-sm font-medium underline-offset-4 hover:underline">
-            Open audit log
-          </Link>
-        </div>
-        {groups.length > 0 ?
-          <ul className="flex flex-col gap-1">
-            {groups.map((group) => {
-              const isSingle = group.items.length === 1;
-              const groupOpen = expandedGroups.includes(group.key);
-              if (isSingle) {
-                const row = group.items[0];
-                if (!row) {
-                  return null;
-                }
-                const title = getAuditTitle(row.entity, row.action);
-                const summary = getAuditSummary(row.diffs);
-                const expanded = expandedRows.includes(row.id);
-                return (
-                  <li key={row.id}>
-                    <button
-                      aria-expanded={expanded}
-                      className="hover:bg-muted/60 flex w-full flex-col gap-0.5 rounded-lg border px-2 py-1.5 text-left text-xs"
-                      onClick={() => toggleRow(row.id)}
-                      type="button">
-                      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <span className="font-semibold">{title}</span>
-                        <span className="text-muted-foreground truncate">
-                          {row.actorEmail ?? "System"}
-                        </span>
-                        <time
-                          className="text-muted-foreground ml-auto shrink-0"
-                          dateTime={row.createdAt}
-                          title={row.createdAtDisplay}>
-                          {getRelativeTime(row.createdAt)}
-                        </time>
-                      </span>
-                      <span className="text-muted-foreground truncate">
-                        {summary}
-                      </span>
-                      {expanded ?
-                        <span className="mt-1 flex flex-col gap-1">
+      <Card className="flex-col gap-2 p-4">
+        <CardHeader className="p-0">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base">Recent admin activity</CardTitle>
+            <Link
+              href={"/dashboard/administrator/audit" as Route}
+              className="text-primary text-sm font-medium underline-offset-4 hover:underline">
+              Open audit log
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {groups.length > 0 ?
+            <ul className="flex flex-col gap-1">
+              {groups.map((group) => {
+                const isSingle = group.items.length === 1;
+                const groupOpen = expandedGroups.includes(group.key);
+                if (isSingle) {
+                  const row = group.items[0];
+                  if (!row) {
+                    return null;
+                  }
+                  const title = getAuditTitle(row.entity, row.action);
+                  const summary = getAuditSummary(row.diffs);
+                  const expanded = expandedRows.includes(row.id);
+                  return (
+                    <li key={row.id}>
+                      <Collapsible
+                        open={expanded}
+                        onOpenChange={() => toggleRow(row.id)}>
+                        <CollapsibleTrigger className="hover:bg-muted/60 flex w-full flex-col gap-0.5 rounded-lg border px-2 py-1.5 text-left text-xs">
+                          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="font-semibold">{title}</span>
+                            <span className="text-muted-foreground truncate">
+                              {row.actorEmail ?? "System"}
+                            </span>
+                            <time
+                              className="text-muted-foreground ml-auto shrink-0"
+                              dateTime={row.createdAt}
+                              title={row.createdAtDisplay}>
+                              {getRelativeTime(row.createdAt)}
+                            </time>
+                          </span>
+                          <span className="text-muted-foreground truncate">
+                            {summary}
+                          </span>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-1 flex flex-col gap-1">
                           {row.diffs.length > 0 ?
                             row.diffs.map((diff) => (
                               <span
-                                className="rounded-md border px-2 py-1"
+                                className="rounded-md border px-2 py-1 text-xs"
                                 key={diff.field}>
                                 <span className="font-semibold">
                                   {getAuditFieldLabel(diff.field)}
@@ -244,100 +264,102 @@ const AdministratorOverview = ({
                                 </span>
                               </span>
                             ))
-                          : <span className="text-muted-foreground">
+                          : <span className="text-muted-foreground text-xs">
                               No field changes
                             </span>
                           }
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </li>
+                  );
+                }
+                return (
+                  <li key={group.key}>
+                    <Collapsible
+                      open={groupOpen}
+                      onOpenChange={() => toggleGroup(group.key)}>
+                      <CollapsibleTrigger className="hover:bg-muted/60 flex w-full flex-col gap-0.5 rounded-lg border px-2 py-1.5 text-left text-xs">
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <span className="font-semibold">
+                            {group.items.length} x {group.title}
+                          </span>
+                          <span className="text-muted-foreground truncate">
+                            by {group.actorEmail ?? "System"}{" "}
+                            {group.dayLabel.toLowerCase()}
+                          </span>
+                          <span className="text-muted-foreground ml-auto shrink-0">
+                            {groupOpen ? "Hide" : "Show"}
+                          </span>
                         </span>
-                      : null}
-                    </button>
+                        <span className="text-muted-foreground">
+                          Grouped to save space
+                        </span>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <ul className="mt-1 flex flex-col gap-1 pl-3">
+                          {group.items.map((row) => {
+                            const title = getAuditTitle(row.entity, row.action);
+                            const summary = getAuditSummary(row.diffs);
+                            const expanded = expandedRows.includes(row.id);
+                            return (
+                              <li key={row.id}>
+                                <Collapsible
+                                  open={expanded}
+                                  onOpenChange={() => toggleRow(row.id)}>
+                                  <CollapsibleTrigger className="hover:bg-muted/60 flex w-full flex-col gap-0.5 rounded-lg border px-2 py-1.5 text-left text-xs">
+                                    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                      <span className="font-semibold">
+                                        {title}
+                                      </span>
+                                      <time
+                                        className="text-muted-foreground ml-auto shrink-0"
+                                        dateTime={row.createdAt}
+                                        title={row.createdAtDisplay}>
+                                        {getRelativeTime(row.createdAt)}
+                                      </time>
+                                    </span>
+                                    <span className="text-muted-foreground truncate">
+                                      {summary}
+                                    </span>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent className="mt-1 flex flex-col gap-1">
+                                    {row.diffs.length > 0 ?
+                                      row.diffs.map((diff) => (
+                                        <span
+                                          className="rounded-md border px-2 py-1 text-xs"
+                                          key={diff.field}>
+                                          <span className="font-semibold">
+                                            {getAuditFieldLabel(diff.field)}
+                                          </span>
+                                          <span className="text-muted-foreground">
+                                            {`: ${formatAuditValue(diff.before)} to ${formatAuditValue(diff.after)}`}
+                                          </span>
+                                        </span>
+                                      ))
+                                    : <span className="text-muted-foreground text-xs">
+                                        No field changes
+                                      </span>
+                                    }
+                                  </CollapsibleContent>
+                                </Collapsible>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </CollapsibleContent>
+                    </Collapsible>
                   </li>
                 );
-              }
-              return (
-                <li key={group.key}>
-                  <button
-                    aria-expanded={groupOpen}
-                    className="hover:bg-muted/60 flex w-full flex-col gap-0.5 rounded-lg border px-2 py-1.5 text-left text-xs"
-                    onClick={() => toggleGroup(group.key)}
-                    type="button">
-                    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <span className="font-semibold">
-                        {group.items.length} x {group.title}
-                      </span>
-                      <span className="text-muted-foreground truncate">
-                        by {group.actorEmail ?? "System"}{" "}
-                        {group.dayLabel.toLowerCase()}
-                      </span>
-                      <span className="text-muted-foreground ml-auto shrink-0">
-                        {groupOpen ? "Hide" : "Show"}
-                      </span>
-                    </span>
-                    <span className="text-muted-foreground">
-                      Grouped to save space
-                    </span>
-                  </button>
-                  {groupOpen ?
-                    <ul className="mt-1 flex flex-col gap-1 pl-3">
-                      {group.items.map((row) => {
-                        const title = getAuditTitle(row.entity, row.action);
-                        const summary = getAuditSummary(row.diffs);
-                        const expanded = expandedRows.includes(row.id);
-                        return (
-                          <li key={row.id}>
-                            <button
-                              aria-expanded={expanded}
-                              className="hover:bg-muted/60 flex w-full flex-col gap-0.5 rounded-lg border px-2 py-1.5 text-left text-xs"
-                              onClick={() => toggleRow(row.id)}
-                              type="button">
-                              <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                                <span className="font-semibold">{title}</span>
-                                <time
-                                  className="text-muted-foreground ml-auto shrink-0"
-                                  dateTime={row.createdAt}
-                                  title={row.createdAtDisplay}>
-                                  {getRelativeTime(row.createdAt)}
-                                </time>
-                              </span>
-                              <span className="text-muted-foreground truncate">
-                                {summary}
-                              </span>
-                              {expanded ?
-                                <span className="mt-1 flex flex-col gap-1">
-                                  {row.diffs.length > 0 ?
-                                    row.diffs.map((diff) => (
-                                      <span
-                                        className="rounded-md border px-2 py-1"
-                                        key={diff.field}>
-                                        <span className="font-semibold">
-                                          {getAuditFieldLabel(diff.field)}
-                                        </span>
-                                        <span className="text-muted-foreground">
-                                          {`: ${formatAuditValue(diff.before)} to ${formatAuditValue(diff.after)}`}
-                                        </span>
-                                      </span>
-                                    ))
-                                  : <span className="text-muted-foreground">
-                                      No field changes
-                                    </span>
-                                  }
-                                </span>
-                              : null}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  : null}
-                </li>
-              );
-            })}
-          </ul>
-        : <p className="text-muted-foreground text-sm">
-            No audit rows yet. User actions will appear here.
-          </p>
-        }
-      </section>
+              })}
+            </ul>
+          : <Empty className="border-0 p-6">
+              <EmptyHeader>
+                <EmptyTitle>No audit rows yet</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
+          }
+        </CardContent>
+      </Card>
     </div>
   );
 };

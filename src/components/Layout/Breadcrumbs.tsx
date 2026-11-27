@@ -1,10 +1,24 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  Fragment,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
+
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/shadcnui/breadcrumb";
 
 export type BreadcrumbItem = {
   href?: Route;
@@ -49,39 +63,32 @@ const Breadcrumbs = () => {
   }
 
   return (
-    <nav
-      aria-label="Breadcrumb"
-      className="min-w-0">
-      <ol className="flex min-w-0 items-center gap-1 text-sm">
+    <Breadcrumb className="min-w-0">
+      <BreadcrumbList className="flex-nowrap">
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
           return (
-            <li
-              key={`${index}-${item.label}`}
-              className="flex min-w-0 items-center gap-1">
+            <Fragment key={`${index}-${item.label}`}>
               {index > 0 ?
-                <ChevronRight
-                  aria-hidden="true"
-                  className="text-muted-foreground size-4 shrink-0"
-                />
+                <BreadcrumbSeparator />
               : null}
-              {item.href && !isLast ?
-                <Link
-                  href={item.href}
-                  className="text-muted-foreground hover:text-foreground min-w-0 truncate transition-colors">
-                  {item.label}
-                </Link>
-              : <span
-                  aria-current="page"
-                  className="text-foreground min-w-0 truncate font-medium">
-                  {item.label}
-                </span>
-              }
-            </li>
+              <BreadcrumbItem className="min-w-0">
+                {item.href && !isLast ?
+                  <BreadcrumbLink
+                    className="min-w-0 truncate"
+                    render={<Link href={item.href} />}>
+                    {item.label}
+                  </BreadcrumbLink>
+                : <BreadcrumbPage className="min-w-0 truncate font-medium">
+                    {item.label}
+                  </BreadcrumbPage>
+                }
+              </BreadcrumbItem>
+            </Fragment>
           );
         })}
-      </ol>
-    </nav>
+      </BreadcrumbList>
+    </Breadcrumb>
   );
 };
 
