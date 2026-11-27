@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Clock,
   Crown,
+  FileText,
   GitBranch,
   GraduationCap,
   HeartHandshake,
@@ -154,6 +155,12 @@ const academicsLinks: DashboardLink[] = [
     href: `${ACADEMICS_BASE}/discipline`,
     icon: ShieldAlert,
     label: "Discipline",
+    requiredPermission: "academic:view",
+  },
+  {
+    href: `${ACADEMICS_BASE}/assignments`,
+    icon: FileText,
+    label: "Assignments",
     requiredPermission: "academic:view",
   },
   {

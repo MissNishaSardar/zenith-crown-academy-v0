@@ -268,6 +268,8 @@ export const AUDIT_ENTITY_OPTIONS = [
   "discipline-incident",
   "staff-attendance",
   "leave-request",
+  "assignment",
+  "assignment-submission",
 ] as const;
 
 export const AUDIT_USER_ACTION_OPTIONS = [

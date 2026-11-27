@@ -88,22 +88,49 @@ type SlotForm = {
   teacherId: string;
 };
 
-const slotDialogSchema = z.object({
-  dayOfWeek: z
-    .number()
-    .int({ error: "Day must be a whole number" })
-    .min(1, { error: "Day must be Monday to Friday" })
-    .max(5, { error: "Day must be Monday to Friday" }),
-  endTime: z.string().trim().min(1, { error: "Enter an end time" }),
-  periodNo: z
-    .number()
-    .int({ error: "Period must be a whole number" })
-    .min(1, { error: "Period must be at least 1" })
-    .max(8, { error: "Period is at most 8" }),
-  startTime: z.string().trim().min(1, { error: "Enter a start time" }),
-  subjectId: z.string().min(1, { error: "Pick a subject" }),
-  teacherId: z.string().min(1, { error: "Pick a teacher" }),
-});
+const slotDialogSchema = z
+  .object({
+    dayOfWeek: z
+      .number()
+      .int({ error: "Day must be a whole number" })
+      .min(1, { error: "Day must be Monday to Friday" })
+      .max(5, { error: "Day must be Monday to Friday" }),
+    endTime: z.string().trim().min(1, { error: "Enter an end time" }),
+    periodNo: z
+      .number()
+      .int({ error: "Period must be a whole number" })
+      .min(1, { error: "Period must be at least 1" })
+      .max(8, { error: "Period is at most 8" }),
+    startTime: z.string().trim().min(1, { error: "Enter a start time" }),
+    subjectId: z.string().min(1, { error: "Pick a subject" }),
+    teacherId: z.string().min(1, { error: "Pick a teacher" }),
+  })
+  .superRefine((data, ctx) => {
+    const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!timePattern.test(data.startTime)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Start time uses HH MM like 09:00",
+        path: ["startTime"],
+      });
+    }
+    if (!timePattern.test(data.endTime)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "End time uses HH MM like 09:45",
+        path: ["endTime"],
+      });
+    }
+    if (timePattern.test(data.startTime) && timePattern.test(data.endTime)) {
+      if (data.endTime <= data.startTime) {
+        ctx.addIssue({
+          code: "custom",
+          message: "End time must be after start time",
+          path: ["endTime"],
+        });
+      }
+    }
+  });
 
 type CoverForm = {
   coverTeacherId: string;

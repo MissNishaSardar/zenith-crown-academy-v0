@@ -1337,3 +1337,66 @@ export const leaveRequestSchema = z
   });
 
 export type leaveRequestType = z.infer<typeof leaveRequestSchema>;
+
+export const assignmentStatusNames = ["DRAFT", "PUBLISHED", "CLOSED"] as const;
+
+export const submissionStatusNames = [
+  "PENDING",
+  "SUBMITTED",
+  "GRADED",
+] as const;
+
+export const assignmentSchema = z
+  .object({
+    classId: z.string().min(1, { error: "Pick a class" }),
+    dueDate: z.string().trim().max(20).nullable().optional(),
+    id: z.string().min(1, { error: "Missing assignment id" }).optional(),
+    instructions: z.string().trim().max(2000).nullable().optional(),
+    sectionId: z.string().trim().max(100).nullable().optional(),
+    status: z.enum(assignmentStatusNames, { error: "Pick a valid status" }),
+    subjectId: z.string().min(1, { error: "Pick a subject" }),
+    title: z
+      .string()
+      .trim()
+      .min(1, { error: "Enter a title" })
+      .max(120, { error: "Title is too long" }),
+    yearId: z.string().min(1, { error: "Pick an academic year" }),
+  })
+  .superRefine((data, ctx) => {
+    const raw = (data.dueDate ?? "").trim();
+    if (data.status === "PUBLISHED" || data.status === "CLOSED") {
+      if (raw === "") {
+        ctx.addIssue({
+          code: "custom",
+          message: "Due date is required to publish",
+          path: ["dueDate"],
+        });
+        return;
+      }
+    }
+    if (raw !== "" && (!datePattern.test(raw) || !isValidCalendarDate(raw))) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Pick a valid due date",
+        path: ["dueDate"],
+      });
+    }
+  });
+
+export type assignmentType = z.infer<typeof assignmentSchema>;
+
+export const assignmentSubmitSchema = z.object({
+  assignmentId: z.string().min(1, { error: "Missing assignment" }),
+  filePath: z.string().trim().max(255).nullable().optional(),
+  text: z.string().trim().max(2000).nullable().optional(),
+});
+
+export type assignmentSubmitType = z.infer<typeof assignmentSubmitSchema>;
+
+export const assignmentGradeSchema = z.object({
+  feedback: z.string().trim().max(1000).nullable().optional(),
+  gradeLabel: z.string().trim().max(20).nullable().optional(),
+  submissionId: z.string().min(1, { error: "Missing submission" }),
+});
+
+export type assignmentGradeType = z.infer<typeof assignmentGradeSchema>;

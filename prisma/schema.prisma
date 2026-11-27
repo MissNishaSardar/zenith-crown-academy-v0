@@ -54,6 +54,7 @@ model User {
   requestedLeaves LeaveRequest[] @relation("LeaveRequester")
   decidedLeaves LeaveRequest[] @relation("LeaveDecider")
   markedStaffAttendance StaffAttendance[] @relation("StaffMarker")
+  createdAssignments Assignment[] @relation("AssignmentCreator")
   @@unique([email])
   @@unique([username])
   @@map("user")
@@ -223,6 +224,7 @@ model AcademicYear {
   attendanceExceptions AttendanceException[]
   timetableSlots TimetableSlot[]
   disciplineIncidents DisciplineIncident[]
+  assignments Assignment[]
 
   @@map("academic_year")
 }
@@ -302,6 +304,7 @@ model SchoolClass {
   attendanceRecords AttendanceRecord[]
   attendanceExceptions AttendanceException[]
   timetableSlots TimetableSlot[]
+  assignments Assignment[]
 
   @@index([order])
   @@map("school_class")
@@ -318,6 +321,7 @@ model Subject {
   enrollmentPicks EnrollmentSubjectPick[]
   teacherAssignments TeacherAssignment[]
   timetableSlots TimetableSlot[]
+  assignments Assignment[]
 
   @@map("subject")
 }
@@ -385,6 +389,7 @@ model Section {
   teacherAssignments TeacherAssignment[]
   attendanceRecords AttendanceRecord[]
   timetableSlots TimetableSlot[]
+  assignments Assignment[]
 
   @@unique([yearId, classId, name])
   @@index([yearId])
@@ -490,6 +495,7 @@ model StudentProfile {
   attendanceExceptions AttendanceException[]
   disciplineIncidents DisciplineIncident[]
   studentLeaves LeaveRequest[] @relation("StudentLeave")
+  submissions AssignmentSubmission[]
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 
@@ -852,4 +858,63 @@ model StaffAttendance {
   @@index([date])
   @@index([markedBy])
   @@map("staff_attendance")
+}
+
+enum AssignmentStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum SubmissionStatus {
+  PENDING
+  SUBMITTED
+  GRADED
+}
+
+model Assignment {
+  id           String           @id @default(cuid())
+  yearId       String
+  year         AcademicYear     @relation(fields: [yearId], references: [id], onDelete: Restrict)
+  classId      String
+  class        SchoolClass      @relation(fields: [classId], references: [id], onDelete: Restrict)
+  sectionId    String?
+  section      Section?         @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subjectId    String
+  subject      Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  title        String
+  instructions String?
+  dueDate      DateTime?
+  status       AssignmentStatus @default(DRAFT)
+  createdBy    String
+  creator      User             @relation("AssignmentCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  submissions  AssignmentSubmission[]
+
+  @@index([yearId, classId, sectionId])
+  @@index([status])
+  @@index([subjectId])
+  @@index([createdBy])
+  @@map("assignment")
+}
+
+model AssignmentSubmission {
+  id           String           @id @default(cuid())
+  assignmentId String
+  assignment   Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      StudentProfile   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  status       SubmissionStatus @default(PENDING)
+  text         String?
+  gradeLabel   String?
+  feedback     String?
+  filePath     String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([assignmentId, studentId])
+  @@index([assignmentId])
+  @@index([studentId])
+  @@map("assignment_submission")
 }

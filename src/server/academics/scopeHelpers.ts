@@ -73,7 +73,7 @@ export const assertTeacherScope = async (
   if (active && can(active, "academic:manage-curriculum")) {
     return { assignmentId: null, ok: true };
   }
-  const assignment = await prisma.teacherAssignment.findFirst({
+  const assignments = await prisma.teacherAssignment.findMany({
     select: { id: true, sectionId: true },
     where: {
       classId: input.classId,
@@ -83,10 +83,10 @@ export const assertTeacherScope = async (
       ...(input.subjectId ? { subjectId: input.subjectId } : {}),
     },
   });
-  const coversSection =
-    assignment !== null &&
-    (assignment.sectionId === null || assignment.sectionId === input.sectionId);
-  if (!assignment || !coversSection) {
+  const covering = assignments.find(
+    (row) => row.sectionId === null || row.sectionId === input.sectionId,
+  );
+  if (!covering) {
     const actorRow = await prisma.user.findUnique({
       select: { email: true, id: true, role: true },
       where: { id: input.userId },
@@ -112,7 +112,7 @@ export const assertTeacherScope = async (
     });
     throw new ForbiddenError("teacher-scope");
   }
-  return { assignmentId: assignment.id, ok: true };
+  return { assignmentId: covering.id, ok: true };
 };
 
 export const isOfficeStaff = (active: string | null): boolean =>
