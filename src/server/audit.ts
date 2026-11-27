@@ -256,7 +256,19 @@ export const toMinimalAuditChange = (
   return { after: nextAfter, before: nextBefore };
 };
 
-export const AUDIT_ENTITY_OPTIONS = ["user", "school_settings"] as const;
+export const AUDIT_ENTITY_OPTIONS = [
+  "user",
+  "school_settings",
+  "enrollment",
+  "teacher-assignment",
+  "attendance-record",
+  "attendance-exception",
+  "timetable-slot",
+  "substitution",
+  "discipline-incident",
+  "staff-attendance",
+  "leave-request",
+] as const;
 
 export const AUDIT_USER_ACTION_OPTIONS = [
   "ban",

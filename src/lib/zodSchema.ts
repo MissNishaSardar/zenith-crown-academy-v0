@@ -1020,3 +1020,320 @@ export const CLASS_LOGIN_MIN_ORDER = 9;
 
 export const isEligibleForStudentLogin = (order: number): boolean =>
   order >= CLASS_LOGIN_MIN_ORDER;
+
+export const enrollmentStatusNames = [
+  "ENROLLED",
+  "PROMOTED",
+  "REPEATED",
+  "TRANSFERRED",
+  "WITHDRAWN",
+  "GRADUATED",
+] as const;
+
+export const SENIOR_SECONDARY_MIN_ORDER = 14;
+
+export const isSeniorSecondaryOrder = (order: number): boolean =>
+  order >= SENIOR_SECONDARY_MIN_ORDER;
+
+export const enrollmentSchema = z.object({
+  classId: z.string().min(1, { error: "Pick a class" }),
+  id: z.string().min(1, { error: "Missing enrollment id" }).optional(),
+  rollNo: z
+    .string()
+    .trim()
+    .min(1, { error: "Enter a roll number" })
+    .max(20, { error: "Roll number is too long" })
+    .regex(/^[A-Za-z0-9-]+$/, {
+      error: "Roll number can use letters, numbers and dashes",
+    }),
+  sectionId: z.string().min(1, { error: "Pick a section" }),
+  status: z.enum(enrollmentStatusNames, { error: "Pick a valid status" }),
+  streamId: z.string().trim().max(100).nullable().optional(),
+  studentId: z.string().min(1, { error: "Pick a student" }),
+  subjectPickIds: z
+    .array(z.string().min(1, { error: "Pick valid subjects" }))
+    .max(12, { error: "Too many subject picks" })
+    .optional(),
+  yearId: z.string().min(1, { error: "Pick an academic year" }),
+});
+
+export type enrollmentType = z.infer<typeof enrollmentSchema>;
+
+export const transferRequestSchema = z.object({
+  enrollmentId: z.string().min(1, { error: "Missing enrollment" }),
+  reason: z
+    .string()
+    .trim()
+    .min(1, { error: "Enter a reason" })
+    .max(500, { error: "Reason is too long" }),
+  targetSectionId: z.string().min(1, { error: "Pick a target section" }),
+});
+
+export type transferRequestType = z.infer<typeof transferRequestSchema>;
+
+export const withdrawalRequestSchema = z.object({
+  enrollmentId: z.string().min(1, { error: "Missing enrollment" }),
+  reason: z
+    .string()
+    .trim()
+    .min(1, { error: "Enter a reason" })
+    .max(500, { error: "Reason is too long" }),
+});
+
+export type withdrawalRequestType = z.infer<typeof withdrawalRequestSchema>;
+
+export const teacherAssignmentSchema = z.object({
+  classId: z.string().min(1, { error: "Pick a class" }),
+  id: z.string().min(1, { error: "Missing assignment id" }).optional(),
+  isActive: z.boolean(),
+  sectionId: z.string().trim().max(100).nullable().optional(),
+  subjectId: z.string().min(1, { error: "Pick a subject" }),
+  teacherId: z.string().min(1, { error: "Pick a teacher" }),
+  yearId: z.string().min(1, { error: "Pick an academic year" }),
+});
+
+export type teacherAssignmentType = z.infer<typeof teacherAssignmentSchema>;
+
+export const attendanceStatusNames = [
+  "PRESENT",
+  "ABSENT",
+  "LATE",
+  "EXCUSED",
+] as const;
+
+export const attendanceExceptionStatusNames = [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+] as const;
+
+export const attendanceRowSchema = z
+  .object({
+    note: z.string().trim().max(500).nullable().optional(),
+    status: z.enum(attendanceStatusNames, { error: "Pick a valid status" }),
+    studentId: z.string().min(1, { error: "Pick a student" }),
+  })
+  .superRefine((data, ctx) => {
+    if (data.status === "EXCUSED" && (data.note ?? "").trim() === "") {
+      ctx.addIssue({
+        code: "custom",
+        message: "Add a note for excused absence",
+        path: ["note"],
+      });
+    }
+  });
+
+export type attendanceRowType = z.infer<typeof attendanceRowSchema>;
+
+export const attendanceMarkSchema = z.object({
+  classId: z.string().min(1, { error: "Pick a class" }),
+  date: z.string().trim().min(1, { error: "Pick a date" }),
+  rows: z
+    .array(attendanceRowSchema)
+    .min(1, { error: "Add at least one student" })
+    .max(300, { error: "Too many rows" }),
+  sectionId: z.string().min(1, { error: "Pick a section" }),
+  yearId: z.string().min(1, { error: "Pick an academic year" }),
+});
+
+export type attendanceMarkType = z.infer<typeof attendanceMarkSchema>;
+
+export const attendanceExceptionSchema = z.object({
+  classId: z.string().min(1, { error: "Pick a class" }),
+  denominator: z
+    .number()
+    .int({ error: "Denominator must be a whole number" })
+    .min(1, { error: "Denominator must be at least 1" })
+    .max(366, { error: "Denominator is too large" }),
+  examTerm: z
+    .string()
+    .trim()
+    .min(1, { error: "Enter an exam term" })
+    .max(80, { error: "Exam term is too long" }),
+  rateHundredths: z
+    .number()
+    .int({ error: "Rate must be a whole number" })
+    .min(0, { error: "Rate cannot be negative" })
+    .max(10000, { error: "Rate is too large" }),
+  reason: z
+    .string()
+    .trim()
+    .min(1, { error: "Enter a reason" })
+    .max(500, { error: "Reason is too long" }),
+  studentId: z.string().min(1, { error: "Pick a student" }),
+  yearId: z.string().min(1, { error: "Pick an academic year" }),
+});
+
+export type attendanceExceptionType = z.infer<typeof attendanceExceptionSchema>;
+
+const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export const timetableSlotSchema = z
+  .object({
+    classId: z.string().min(1, { error: "Pick a class" }),
+    dayOfWeek: z
+      .number()
+      .int({ error: "Day must be a whole number" })
+      .min(1, { error: "Day must be Monday to Friday" })
+      .max(5, { error: "Day must be Monday to Friday" }),
+    endTime: z.string().trim().min(1, { error: "Enter an end time" }),
+    id: z.string().min(1, { error: "Missing slot id" }).optional(),
+    periodNo: z
+      .number()
+      .int({ error: "Period must be a whole number" })
+      .min(1, { error: "Period must be at least 1" })
+      .max(8, { error: "Period is at most 8" }),
+    sectionId: z.string().min(1, { error: "Pick a section" }),
+    startTime: z.string().trim().min(1, { error: "Enter a start time" }),
+    subjectId: z.string().min(1, { error: "Pick a subject" }),
+    teacherId: z.string().min(1, { error: "Pick a teacher" }),
+    yearId: z.string().min(1, { error: "Pick an academic year" }),
+  })
+  .superRefine((data, ctx) => {
+    if (!timePattern.test(data.startTime)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Start time uses HH MM like 09:00",
+        path: ["startTime"],
+      });
+    }
+    if (!timePattern.test(data.endTime)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "End time uses HH MM like 09:45",
+        path: ["endTime"],
+      });
+    }
+    if (timePattern.test(data.startTime) && timePattern.test(data.endTime)) {
+      if (data.endTime <= data.startTime) {
+        ctx.addIssue({
+          code: "custom",
+          message: "End time must be after start time",
+          path: ["endTime"],
+        });
+      }
+    }
+  });
+
+export type timetableSlotType = z.infer<typeof timetableSlotSchema>;
+
+export const substitutionSchema = z.object({
+  coverTeacherId: z.string().min(1, { error: "Pick a cover teacher" }),
+  date: z.string().trim().min(1, { error: "Pick a date" }),
+  reason: z
+    .string()
+    .trim()
+    .min(1, { error: "Enter a reason" })
+    .max(500, { error: "Reason is too long" }),
+  slotId: z.string().min(1, { error: "Pick a slot" }),
+});
+
+export type substitutionType = z.infer<typeof substitutionSchema>;
+
+export const disciplineCategoryNames = [
+  "LATE",
+  "MISCONDUCT",
+  "BULLYING",
+  "CHEATING",
+  "VANDALISM",
+  "ABSENTEEISM",
+  "OTHER",
+] as const;
+
+export const disciplineStatusNames = ["OPEN", "CLOSED"] as const;
+
+export const disciplineSchema = z
+  .object({
+    actionTaken: z.string().trim().max(500).nullable().optional(),
+    category: z.enum(disciplineCategoryNames, {
+      error: "Pick a valid category",
+    }),
+    categoryNote: z.string().trim().max(100).nullable().optional(),
+    date: z.string().trim().min(1, { error: "Pick a date" }),
+    description: z
+      .string()
+      .trim()
+      .min(1, { error: "Enter a description" })
+      .max(1000, { error: "Description is too long" }),
+    id: z.string().min(1, { error: "Missing incident id" }).optional(),
+    status: z.enum(disciplineStatusNames, { error: "Pick a valid status" }),
+    studentId: z.string().min(1, { error: "Pick a student" }),
+    yearId: z.string().min(1, { error: "Pick an academic year" }),
+  })
+  .superRefine((data, ctx) => {
+    const note = (data.categoryNote ?? "").trim();
+    if (data.category === "OTHER" && note === "") {
+      ctx.addIssue({
+        code: "custom",
+        message: "Add a note for category other",
+        path: ["categoryNote"],
+      });
+    }
+    if (data.status === "CLOSED" && (data.actionTaken ?? "").trim() === "") {
+      ctx.addIssue({
+        code: "custom",
+        message: "Action taken is required to close",
+        path: ["actionTaken"],
+      });
+    }
+  });
+
+export type disciplineType = z.infer<typeof disciplineSchema>;
+
+export const staffAttendanceStatusNames = [
+  "PRESENT",
+  "LEAVE",
+  "ON_DUTY",
+] as const;
+
+export const staffAttendanceSchema = z.object({
+  date: z.string().trim().min(1, { error: "Pick a date" }),
+  leaveRequestId: z.string().trim().max(100).nullable().optional(),
+  staffId: z.string().min(1, { error: "Pick a staff member" }),
+  status: z.enum(staffAttendanceStatusNames, { error: "Pick a valid status" }),
+});
+
+export type staffAttendanceType = z.infer<typeof staffAttendanceSchema>;
+
+export const leaveTargetNames = ["STAFF", "STUDENT"] as const;
+
+export const leaveStatusNames = ["PENDING", "APPROVED", "REJECTED"] as const;
+
+export const leaveRequestSchema = z
+  .object({
+    endDate: z.string().trim().min(1, { error: "Pick an end date" }),
+    reason: z
+      .string()
+      .trim()
+      .min(1, { error: "Enter a reason" })
+      .max(500, { error: "Reason is too long" }),
+    staffId: z.string().trim().max(100).nullable().optional(),
+    startDate: z.string().trim().min(1, { error: "Pick a start date" }),
+    studentId: z.string().trim().max(100).nullable().optional(),
+    target: z.enum(leaveTargetNames, { error: "Pick a valid target" }),
+  })
+  .superRefine((data, ctx) => {
+    if (data.target === "STAFF" && !(data.staffId ?? "").trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Pick a staff member",
+        path: ["staffId"],
+      });
+    }
+    if (data.target === "STUDENT" && !(data.studentId ?? "").trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Pick a student",
+        path: ["studentId"],
+      });
+    }
+    if (data.startDate > data.endDate) {
+      ctx.addIssue({
+        code: "custom",
+        message: "End date is before start date",
+        path: ["endDate"],
+      });
+    }
+  });
+
+export type leaveRequestType = z.infer<typeof leaveRequestSchema>;

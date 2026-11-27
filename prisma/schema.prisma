@@ -37,8 +37,23 @@ model User {
   staffProfile    StaffProfile?   @relation("StaffProfileUser")
   guardianProfile Guardian?       @relation("GuardianUser")
   studentProfile  StudentProfile? @relation("StudentUser")
+  teacherAssignments TeacherAssignment[]
 
   username String?
+  markedAttendance AttendanceRecord[] @relation("MarkedAttendance")
+  recommendedExceptions AttendanceException[] @relation("ExceptionRecommender")
+  decidedExceptions AttendanceException[] @relation("ExceptionDecider")
+  timetableSlots TimetableSlot[] @relation("SlotTeacher")
+  coverSubstitutions Substitution[] @relation("SubstitutionCover")
+  classTeacherSections Section[] @relation("SectionTeacher")
+  delegationsFrom Delegation[] @relation("DelegationFrom")
+  delegationsTo Delegation[] @relation("DelegationTo")
+  reportedDiscipline DisciplineIncident[] @relation("DisciplineReporter")
+  requestedSubstitutions Substitution[] @relation("SubstitutionRequester")
+  decidedSubstitutions Substitution[] @relation("SubstitutionDecider")
+  requestedLeaves LeaveRequest[] @relation("LeaveRequester")
+  decidedLeaves LeaveRequest[] @relation("LeaveDecider")
+  markedStaffAttendance StaffAttendance[] @relation("StaffMarker")
   @@unique([email])
   @@unique([username])
   @@map("user")
@@ -202,6 +217,12 @@ model AcademicYear {
   days      WorkingDay[]
   sections  Section[]
   students  StudentProfile[]
+  enrollments Enrollment[]
+  teacherAssignments TeacherAssignment[]
+  attendanceRecords AttendanceRecord[]
+  attendanceExceptions AttendanceException[]
+  timetableSlots TimetableSlot[]
+  disciplineIncidents DisciplineIncident[]
 
   @@map("academic_year")
 }
@@ -238,6 +259,7 @@ model ApprovalRequest {
   reason      String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  substitutions Substitution[]
 
   @@index([status])
   @@index([action])
@@ -248,7 +270,9 @@ model ApprovalRequest {
 model Delegation {
   id        String   @id @default(cuid())
   fromId    String
+  from      User     @relation("DelegationFrom", fields: [fromId], references: [id], onDelete: Cascade)
   toId      String
+  to        User     @relation("DelegationTo", fields: [toId], references: [id], onDelete: Cascade)
   scope     String
   startAt   DateTime
   endAt     DateTime
@@ -273,6 +297,11 @@ model SchoolClass {
   classSubjects ClassSubject[]
   streams Stream[]
   students StudentProfile[]
+  enrollments Enrollment[]
+  teacherAssignments TeacherAssignment[]
+  attendanceRecords AttendanceRecord[]
+  attendanceExceptions AttendanceException[]
+  timetableSlots TimetableSlot[]
 
   @@index([order])
   @@map("school_class")
@@ -286,6 +315,9 @@ model Subject {
   updatedAt DateTime @updatedAt
   classLinks ClassSubject[]
   streamLinks StreamSubject[]
+  enrollmentPicks EnrollmentSubjectPick[]
+  teacherAssignments TeacherAssignment[]
+  timetableSlots TimetableSlot[]
 
   @@map("subject")
 }
@@ -314,6 +346,7 @@ model Stream {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   subjects  StreamSubject[]
+  enrollments Enrollment[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -344,13 +377,19 @@ model Section {
   name           String
   capacity       Int
   classTeacherId String
+  classTeacher   User        @relation("SectionTeacher", fields: [classTeacherId], references: [id], onDelete: Restrict)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   students       StudentProfile[]
+  enrollments    Enrollment[]
+  teacherAssignments TeacherAssignment[]
+  attendanceRecords AttendanceRecord[]
+  timetableSlots TimetableSlot[]
 
   @@unique([yearId, classId, name])
   @@index([yearId])
   @@index([classId])
+  @@index([classTeacherId])
   @@map("section")
 }
 
@@ -393,6 +432,8 @@ model StaffProfile {
   wardNote      String?
   wardDeclaredBy String?
   wardDeclaredAt DateTime?
+  staffAttendances StaffAttendance[]
+  staffLeaves LeaveRequest[] @relation("StaffLeave")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -444,6 +485,11 @@ model StudentProfile {
   staffWards      StaffProfile[]          @relation("StaffWard")
   guardianLinks   StudentGuardianLink[]
   documents       DocumentChecklist[]
+  enrollments     Enrollment[]
+  attendanceRecords AttendanceRecord[]
+  attendanceExceptions AttendanceException[]
+  disciplineIncidents DisciplineIncident[]
+  studentLeaves LeaveRequest[] @relation("StudentLeave")
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 
@@ -501,4 +547,309 @@ model DocumentChecklist {
   @@unique([studentId, docType, label])
   @@index([studentId])
   @@map("document_checklist")
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  PROMOTED
+  REPEATED
+  TRANSFERRED
+  WITHDRAWN
+  GRADUATED
+}
+
+model Enrollment {
+  id        String           @id @default(cuid())
+  yearId    String
+  year      AcademicYear     @relation(fields: [yearId], references: [id], onDelete: Restrict)
+  studentId String
+  student   StudentProfile   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId   String
+  class     SchoolClass      @relation(fields: [classId], references: [id], onDelete: Restrict)
+  sectionId String
+  section   Section          @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  streamId  String?
+  stream    Stream?          @relation(fields: [streamId], references: [id], onDelete: SetNull)
+  rollNo    String
+  status    EnrollmentStatus @default(ENROLLED)
+  picks     EnrollmentSubjectPick[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([studentId, yearId])
+  @@unique([sectionId, rollNo])
+  @@index([yearId])
+  @@index([classId])
+  @@index([sectionId])
+  @@index([streamId])
+  @@index([status])
+  @@map("enrollment")
+}
+
+model EnrollmentSubjectPick {
+  id           String     @id @default(cuid())
+  enrollmentId String
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  subjectId    String
+  subject      Subject    @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  createdAt    DateTime   @default(now())
+
+  @@unique([enrollmentId, subjectId])
+  @@index([enrollmentId])
+  @@index([subjectId])
+  @@map("enrollment_subject_pick")
+}
+
+model TeacherAssignment {
+  id        String       @id @default(cuid())
+  yearId    String
+  year      AcademicYear @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  classId   String
+  class     SchoolClass  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  sectionId String?
+  section   Section?     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacherId String
+  teacher   User         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([yearId])
+  @@index([classId])
+  @@index([sectionId])
+  @@index([subjectId])
+  @@index([teacherId])
+  @@map("teacher_assignment")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum AttendanceExceptionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AttendanceRecord {
+  id        String           @id @default(cuid())
+  yearId    String
+  year      AcademicYear     @relation(fields: [yearId], references: [id], onDelete: Restrict)
+  classId   String
+  class     SchoolClass      @relation(fields: [classId], references: [id], onDelete: Restrict)
+  sectionId String
+  section   Section          @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  studentId String
+  student   StudentProfile   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  date      DateTime
+  status    AttendanceStatus
+  note      String?
+  markedBy  String
+  marker    User             @relation("MarkedAttendance", fields: [markedBy], references: [id], onDelete: Restrict)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([studentId, date])
+  @@index([yearId, classId, sectionId, date])
+  @@index([studentId])
+  @@index([date])
+  @@map("attendance_record")
+}
+
+model AttendanceException {
+  id             String                     @id @default(cuid())
+  studentId      String
+  student        StudentProfile             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  yearId         String
+  year           AcademicYear               @relation(fields: [yearId], references: [id], onDelete: Restrict)
+  classId        String
+  class          SchoolClass                @relation(fields: [classId], references: [id], onDelete: Restrict)
+  examTerm       String
+  rateHundredths Int
+  denominator    Int
+  reason         String
+  status         AttendanceExceptionStatus  @default(PENDING)
+  recommendedBy  String?
+  recommender    User?                      @relation("ExceptionRecommender", fields: [recommendedBy], references: [id], onDelete: SetNull)
+  decidedBy      String?
+  decider        User?                      @relation("ExceptionDecider", fields: [decidedBy], references: [id], onDelete: SetNull)
+  decidedAt      DateTime?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@index([studentId, yearId])
+  @@index([yearId])
+  @@index([classId])
+  @@index([status])
+  @@map("attendance_exception")
+}
+
+enum SubstitutionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  APPLIED
+}
+
+model TimetableSlot {
+  id          String   @id @default(cuid())
+  yearId      String
+  year        AcademicYear @relation(fields: [yearId], references: [id], onDelete: Restrict)
+  classId     String
+  class       SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  sectionId   String
+  section     Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  dayOfWeek   Int
+  periodNo    Int
+  startTime   String
+  endTime     String
+  subjectId   String
+  subject     Subject @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacherId   String
+  teacher     User @relation("SlotTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  substitutions Substitution[]
+
+  @@unique([yearId, classId, sectionId, dayOfWeek, periodNo])
+  @@index([teacherId, yearId, dayOfWeek, periodNo])
+  @@index([yearId, classId, sectionId])
+  @@map("timetable_slot")
+}
+
+model Substitution {
+  id             String             @id @default(cuid())
+  slotId         String
+  slot           TimetableSlot      @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  date           DateTime
+  coverTeacherId String
+  coverTeacher   User               @relation("SubstitutionCover", fields: [coverTeacherId], references: [id], onDelete: Restrict)
+  reason         String
+  status         SubstitutionStatus @default(PENDING)
+  requestedBy    String
+  requester      User               @relation("SubstitutionRequester", fields: [requestedBy], references: [id], onDelete: Restrict)
+  decidedBy      String?
+  decider        User?              @relation("SubstitutionDecider", fields: [decidedBy], references: [id], onDelete: SetNull)
+  approvalId     String?
+  approval       ApprovalRequest?   @relation(fields: [approvalId], references: [id], onDelete: SetNull)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([slotId, date])
+  @@index([slotId])
+  @@index([date])
+  @@index([status])
+  @@index([requestedBy])
+  @@index([decidedBy])
+  @@index([approvalId])
+  @@map("substitution")
+}
+
+enum DisciplineCategory {
+  LATE
+  MISCONDUCT
+  BULLYING
+  CHEATING
+  VANDALISM
+  ABSENTEEISM
+  OTHER
+}
+
+enum DisciplineStatus {
+  OPEN
+  CLOSED
+}
+
+enum StaffAttendanceStatus {
+  PRESENT
+  LEAVE
+  ON_DUTY
+}
+
+enum LeaveTarget {
+  STAFF
+  STUDENT
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model DisciplineIncident {
+  id           String             @id @default(cuid())
+  studentId    String
+  student      StudentProfile     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  yearId       String
+  year         AcademicYear       @relation(fields: [yearId], references: [id], onDelete: Restrict)
+  date         DateTime
+  category     DisciplineCategory
+  categoryNote String?
+  description  String
+  actionTaken  String?
+  reportedBy   String
+  reporter     User               @relation("DisciplineReporter", fields: [reportedBy], references: [id], onDelete: Restrict)
+  status       DisciplineStatus   @default(OPEN)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([studentId, yearId])
+  @@index([yearId])
+  @@index([reportedBy])
+  @@index([status])
+  @@map("discipline_incident")
+}
+
+model LeaveRequest {
+  id          String      @id @default(cuid())
+  target      LeaveTarget
+  staffId     String?
+  staff       StaffProfile? @relation("StaffLeave", fields: [staffId], references: [id], onDelete: Cascade)
+  studentId   String?
+  student     StudentProfile? @relation("StudentLeave", fields: [studentId], references: [id], onDelete: Cascade)
+  startDate   DateTime
+  endDate     DateTime
+  reason      String
+  status      LeaveStatus @default(PENDING)
+  requestedBy String
+  requester   User        @relation("LeaveRequester", fields: [requestedBy], references: [id], onDelete: Restrict)
+  decidedBy   String?
+  decider     User?       @relation("LeaveDecider", fields: [decidedBy], references: [id], onDelete: SetNull)
+  decidedAt   DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  attendances StaffAttendance[]
+
+  @@index([status])
+  @@index([staffId])
+  @@index([studentId])
+  @@index([requestedBy])
+  @@index([decidedBy])
+  @@map("leave_request")
+}
+
+model StaffAttendance {
+  id             String                @id @default(cuid())
+  staffId        String
+  staff          StaffProfile          @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  date           DateTime
+  status         StaffAttendanceStatus
+  markedBy       String
+  marker         User                @relation("StaffMarker", fields: [markedBy], references: [id], onDelete: Restrict)
+  leaveRequestId String?
+  leaveRequest   LeaveRequest?         @relation(fields: [leaveRequestId], references: [id], onDelete: SetNull)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@unique([staffId, date])
+  @@index([date])
+  @@index([markedBy])
+  @@map("staff_attendance")
 }

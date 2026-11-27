@@ -4,8 +4,20 @@ import { Fragment } from "react";
 import type { ReactNode } from "react";
 import type { Row, Table as TanStackTable } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { Button } from "@/components/shadcnui/button";
+import { Empty, EmptyHeader, EmptyTitle } from "@/components/shadcnui/empty";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+} from "@/components/shadcnui/pagination";
 import {
   Table,
   TableBody,
@@ -114,10 +126,12 @@ const DataTable = <TData,>({
             );
           })
         : <TableRow>
-            <TableCell
-              className="h-24 text-center"
-              colSpan={columnCount}>
-              {emptyMessage}
+            <TableCell colSpan={columnCount}>
+              <Empty className="border-0 p-6">
+                <EmptyHeader>
+                  <EmptyTitle>{emptyMessage}</EmptyTitle>
+                </EmptyHeader>
+              </Empty>
             </TableCell>
           </TableRow>
         }
@@ -140,29 +154,41 @@ const DataTablePagination = ({
   page,
   pageLabel,
   totalPages,
-}: DataTablePaginationProps) => (
-  <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-    <p className="text-muted-foreground text-sm">{pageLabel}</p>
-    <div className="flex items-center gap-2">
-      <Button
-        disabled={page <= 1}
-        onClick={onPrevious}
-        size="sm"
-        type="button"
-        variant="outline">
-        Previous
-      </Button>
-      <Button
-        disabled={page >= totalPages}
-        onClick={onNext}
-        size="sm"
-        type="button"
-        variant="outline">
-        Next
-      </Button>
+}: DataTablePaginationProps) => {
+  const prevDisabled = page <= 1;
+  const nextDisabled = page >= totalPages;
+  return (
+    <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-muted-foreground text-sm">{pageLabel}</p>
+      <Pagination className="mx-0 w-auto justify-end">
+        <PaginationContent>
+          <PaginationItem>
+            <Button
+              disabled={prevDisabled}
+              onClick={onPrevious}
+              size="sm"
+              type="button"
+              variant="outline">
+              <ChevronLeft data-icon="inline-start" />
+              Previous
+            </Button>
+          </PaginationItem>
+          <PaginationItem>
+            <Button
+              disabled={nextDisabled}
+              onClick={onNext}
+              size="sm"
+              type="button"
+              variant="outline">
+              Next
+              <ChevronRight data-icon="inline-end" />
+            </Button>
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
     </div>
-  </div>
-);
+  );
+};
 
 type DataTableSortButtonProps = {
   column: {

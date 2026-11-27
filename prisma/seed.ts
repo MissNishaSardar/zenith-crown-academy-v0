@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import { PrismaLibSql } from "@prisma/adapter-libsql";
+import { fakerEN_IN as faker } from "@faker-js/faker";
 import { generateRandomString, hashPassword } from "better-auth/crypto";
 
 import { PrismaClient } from "@generated/prisma/client";
@@ -107,6 +108,24 @@ const main = async () => {
       "Refusing to seed in production: seed passwords are predictable dev passwords. Set up real accounts through the admin flow instead.",
     );
   }
+
+  // Deterministic faker so reseed restores the same realistic demo data.
+  // Login emails, usernames, roles, employeeIds, and admissionNos stay fixed.
+  // Only display names, phones, addresses, and previous schools use faker.
+  faker.seed(20261127);
+
+  const indianPhone = () => `+91 ${faker.helpers.fromRegExp("[6-9][0-9]{9}")}`;
+  const delhiAddress = () =>
+    `${faker.location.streetAddress()}, Delhi`.slice(0, 200);
+  const schoolName = () =>
+    `${faker.location.city()} Public School`.slice(0, 100);
+
+  // Shared family keeps the staff ward match demo intact:
+  // same surname plus address across staff, guardians, and students.
+  const familySurname = faker.person.lastName();
+  const familyAddress = delhiAddress();
+  const kabirSurname = faker.person.lastName();
+  const kabirAddress = delhiAddress();
 
   for (const seedUser of seedUsers) {
     const passwordHash = await hashPassword(seedUser.email);
@@ -334,138 +353,178 @@ const main = async () => {
     teacherParentUser &&
     principalUser
   ) {
+    const staff1First = faker.person.firstName();
+    const staff1Last = faker.person.lastName();
+    const staff1Address = delhiAddress();
+    const staff1Phone = indianPhone();
+    const staff2First = faker.person.firstName();
+    const staff2Last = faker.person.lastName();
+    const staff2Address = delhiAddress();
+    const staff2Phone = indianPhone();
+    const staff3First = faker.person.firstName();
+    const staff3Phone = indianPhone();
+    const parentGuardianFirst = faker.person.firstName();
+    const parentGuardianPhone = indianPhone();
+    const noLoginFirst = faker.person.firstName();
+    const noLoginPhone = indianPhone();
+    const student1First = faker.person.firstName();
+    const student2First = faker.person.firstName();
+    const student3First = faker.person.firstName();
+    const student1School = schoolName();
+    const student2School = schoolName();
+    const student3School = schoolName();
+
     await prisma.staffProfile.upsert({
       create: {
-        address: "12 School Road, Delhi",
+        address: staff1Address,
         designation: "Assistant Teacher",
         email: "teacher@gmail.com",
         employeeId: "EMP001",
-        firstName: "Meera",
+        firstName: staff1First,
         isActive: true,
         joiningDate: new Date("2023-06-01T00:00:00"),
-        lastName: "Teacher",
-        phone: "+91 9876500001",
+        lastName: staff1Last,
+        phone: staff1Phone,
         userId: teacherUser.id,
       },
       update: {
-        address: "12 School Road, Delhi",
+        address: staff1Address,
         designation: "Assistant Teacher",
+        firstName: staff1First,
         isActive: true,
+        lastName: staff1Last,
+        phone: staff1Phone,
         userId: teacherUser.id,
       },
       where: { employeeId: "EMP001" },
     });
     await prisma.staffProfile.upsert({
       create: {
-        address: "14 School Road, Delhi",
+        address: staff2Address,
         designation: "Office Assistant",
         email: "officestaff@gmail.com",
         employeeId: "EMP002",
-        firstName: "Rohan",
+        firstName: staff2First,
         isActive: true,
         joiningDate: new Date("2024-04-01T00:00:00"),
-        lastName: "Office",
-        phone: "+91 9876500002",
+        lastName: staff2Last,
+        phone: staff2Phone,
         userId: officeUser.id,
       },
       update: {
-        address: "14 School Road, Delhi",
+        address: staff2Address,
         designation: "Office Assistant",
+        firstName: staff2First,
         isActive: true,
+        lastName: staff2Last,
+        phone: staff2Phone,
         userId: officeUser.id,
       },
       where: { employeeId: "EMP002" },
     });
     await prisma.staffProfile.upsert({
       create: {
-        address: "7 Home Street, Delhi",
+        address: familyAddress,
         designation: "Primary Teacher",
         email: "teacherparent@gmail.com",
         employeeId: "EMP003",
-        firstName: "Anita",
+        firstName: staff3First,
         isActive: true,
         joiningDate: new Date("2022-06-01T00:00:00"),
-        lastName: "Sharma",
-        phone: "+91 9876510002",
+        lastName: familySurname,
+        phone: staff3Phone,
         userId: teacherParentUser.id,
       },
       update: {
-        address: "7 Home Street, Delhi",
+        address: familyAddress,
         designation: "Primary Teacher",
+        firstName: staff3First,
         isActive: true,
+        lastName: familySurname,
+        phone: staff3Phone,
         userId: teacherParentUser.id,
       },
       where: { employeeId: "EMP003" },
     });
     await prisma.guardian.upsert({
       create: {
-        address: "7 Home Street, Delhi",
+        address: familyAddress,
         email: "parent@gmail.com",
-        name: "Ramesh Parent",
-        phone: "+91 9876510001",
+        name: `${parentGuardianFirst} ${familySurname}`,
+        phone: parentGuardianPhone,
         relation: "FATHER",
         userId: parentUser.id,
       },
       update: {
-        address: "7 Home Street, Delhi",
-        name: "Ramesh Parent",
-        phone: "+91 9876510001",
+        address: familyAddress,
+        name: `${parentGuardianFirst} ${familySurname}`,
+        phone: parentGuardianPhone,
         relation: "FATHER",
       },
       where: { userId: parentUser.id },
     });
     await prisma.guardian.upsert({
       create: {
-        address: "7 Home Street, Delhi",
+        address: familyAddress,
         email: "teacherparent@gmail.com",
-        name: "Anita Sharma",
-        phone: "+91 9876510002",
+        name: `${staff3First} ${familySurname}`,
+        phone: staff3Phone,
         relation: "MOTHER",
         userId: teacherParentUser.id,
       },
       update: {
-        address: "7 Home Street, Delhi",
-        name: "Anita Sharma",
-        phone: "+91 9876510002",
+        address: familyAddress,
+        name: `${staff3First} ${familySurname}`,
+        phone: staff3Phone,
         relation: "MOTHER",
       },
       where: { userId: teacherParentUser.id },
     });
     const noLoginGuardian = await prisma.guardian.findFirst({
-      where: { name: "Sunita Sharma", phone: "+91 9876510003" },
+      where: { userId: null, relation: "MOTHER" },
     });
     if (!noLoginGuardian) {
       await prisma.guardian.create({
         data: {
-          address: "7 Home Street, Delhi",
+          address: familyAddress,
           email: null,
-          name: "Sunita Sharma",
-          phone: "+91 9876510003",
+          name: `${noLoginFirst} ${familySurname}`,
+          phone: noLoginPhone,
           relation: "MOTHER",
           userId: null,
         },
+      });
+    } else {
+      await prisma.guardian.update({
+        data: {
+          address: familyAddress,
+          name: `${noLoginFirst} ${familySurname}`,
+          phone: noLoginPhone,
+        },
+        where: { id: noLoginGuardian.id },
       });
     }
     const yearPrefix = currentYear.name.trim();
     await prisma.studentProfile.upsert({
       create: {
-        address: "7 Home Street, Delhi",
+        address: familyAddress,
         admissionNo: `${yearPrefix}/001`,
         admissionStatus: "ACTIVE",
         classId: class1.id,
         dob: new Date("2018-05-10T00:00:00"),
-        firstName: "Aarav",
+        firstName: student1First,
         gender: "MALE",
-        lastName: "Sharma",
-        previousSchool: "Little Flowers Nursery",
+        lastName: familySurname,
+        previousSchool: student1School,
         userId: null,
         yearId: currentYear.id,
       },
       update: {
-        address: "7 Home Street, Delhi",
+        address: familyAddress,
         classId: class1.id,
-        firstName: "Aarav",
-        lastName: "Sharma",
+        firstName: student1First,
+        lastName: familySurname,
+        previousSchool: student1School,
         userId: null,
         yearId: currentYear.id,
       },
@@ -473,23 +532,24 @@ const main = async () => {
     });
     await prisma.studentProfile.upsert({
       create: {
-        address: "7 Home Street, Delhi",
+        address: familyAddress,
         admissionNo: `${yearPrefix}/002`,
         admissionStatus: "ACTIVE",
         classId: class5.id,
         dob: new Date("2015-08-20T00:00:00"),
-        firstName: "Diya",
+        firstName: student2First,
         gender: "FEMALE",
-        lastName: "Sharma",
-        previousSchool: "City Primary",
+        lastName: familySurname,
+        previousSchool: student2School,
         userId: null,
         yearId: currentYear.id,
       },
       update: {
-        address: "7 Home Street, Delhi",
+        address: familyAddress,
         classId: class5.id,
-        firstName: "Diya",
-        lastName: "Sharma",
+        firstName: student2First,
+        lastName: familySurname,
+        previousSchool: student2School,
         userId: null,
         yearId: currentYear.id,
       },
@@ -497,23 +557,24 @@ const main = async () => {
     });
     await prisma.studentProfile.upsert({
       create: {
-        address: "9 Home Street, Delhi",
+        address: kabirAddress,
         admissionNo: `${yearPrefix}/003`,
         admissionStatus: "ACTIVE",
         classId: class6.id,
         dob: new Date("2014-03-15T00:00:00"),
-        firstName: "Kabir",
+        firstName: student3First,
         gender: "MALE",
-        lastName: "Verma",
-        previousSchool: "City Primary",
+        lastName: kabirSurname,
+        previousSchool: student3School,
         userId: studentUser.id,
         yearId: currentYear.id,
       },
       update: {
-        address: "9 Home Street, Delhi",
+        address: kabirAddress,
         classId: class6.id,
-        firstName: "Kabir",
-        lastName: "Verma",
+        firstName: student3First,
+        lastName: kabirSurname,
+        previousSchool: student3School,
         userId: studentUser.id,
         yearId: currentYear.id,
       },
