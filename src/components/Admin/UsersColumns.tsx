@@ -1,8 +1,6 @@
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
-
 import { legacyCreateColumnHelper } from "@tanstack/react-table/legacy";
+import { DataTableSortButton } from "@/components/DataTable/DataTable";
 import { Badge } from "@/components/shadcnui/badge";
-import { Button } from "@/components/shadcnui/button";
 import { roleLabels, type RoleName } from "@/lib/auth/permissions";
 import { formatDateDisplay } from "@/lib/formatDate";
 
@@ -28,23 +26,12 @@ const SortableHeader = ({
     toggleSorting: (desc?: boolean) => void;
   };
   label: string;
-}) => {
-  const sorted = column.getIsSorted();
-  return (
-    <Button
-      aria-label={`Sort by ${label}`}
-      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      type="button"
-      variant="ghost">
-      {label}
-      {sorted === "asc" ?
-        <ArrowUp data-icon="inline-end" />
-      : sorted === "desc" ?
-        <ArrowDown data-icon="inline-end" />
-      : <ArrowUpDown data-icon="inline-end" />}
-    </Button>
-  );
-};
+}) => (
+  <DataTableSortButton
+    column={column}
+    label={label}
+  />
+);
 
 const columnHelper = legacyCreateColumnHelper<UsersRow>();
 

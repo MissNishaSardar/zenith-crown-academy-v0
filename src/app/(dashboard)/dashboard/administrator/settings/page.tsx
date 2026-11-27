@@ -4,7 +4,6 @@ import { BreadcrumbTrail } from "@/components/Layout/Breadcrumbs";
 import PageHeader from "@/components/Layout/PageHeader";
 import SchoolSettingsForm from "@/components/Admin/SchoolSettingsForm";
 import { ensureSchoolSettings } from "@/lib/school-branding";
-import { can } from "@/lib/auth/permissions";
 import { requirePermission } from "@/server/guards";
 
 export const metadata: Metadata = {
@@ -12,9 +11,8 @@ export const metadata: Metadata = {
 };
 
 const SettingsPage = async () => {
-  const session = await requirePermission("system:view");
+  await requirePermission("system:manage");
   const settings = await ensureSchoolSettings();
-  const canEdit = can(session.user.role, "system:manage");
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -33,7 +31,6 @@ const SettingsPage = async () => {
         title="System settings"
       />
       <SchoolSettingsForm
-        canEdit={canEdit}
         initialLogoPath={settings.logoPath}
         initialValues={{
           academicYear: settings.academicYear,

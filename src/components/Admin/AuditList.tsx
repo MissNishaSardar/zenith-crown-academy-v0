@@ -4,15 +4,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { Route } from "next";
+import { getCoreRowModel, useLegacyTable } from "@tanstack/react-table/legacy";
+import { legacyCreateColumnHelper } from "@tanstack/react-table/legacy";
 import { Button } from "@/components/shadcnui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/shadcnui/table";
+import DataTable, {
+  DataTablePagination,
+} from "@/components/DataTable/DataTable";
 import {
   formatAuditValue,
   getAuditEntityLabel,
@@ -65,6 +62,8 @@ const buildPageHref = (
   return `${base}?${params.toString()}`;
 };
 
+const columnHelper = legacyCreateColumnHelper<AuditRow>();
+
 const AuditList = ({
   action,
   base,
@@ -91,140 +90,133 @@ const AuditList = ({
     setExpandedId((current) => (current === id ? null : id));
   };
 
+  const auditColumns = columnHelper.columns([
+    columnHelper.accessor("createdAt", {
+      cell: ({ row }) => (
+        <span className="text-muted-foreground px-2 py-1.5 whitespace-nowrap">
+          <time
+            dateTime={row.original.createdAt}
+            title={row.original.createdAtDisplay}>
+            {getRelativeTime(row.original.createdAt)}
+          </time>
+        </span>
+      ),
+      header: "Time",
+    }),
+    columnHelper.display({
+      cell: ({ row }) => {
+        const title = getAuditTitle(row.original.entity, row.original.action);
+        return (
+          <span className="block max-w-[280px] px-2 py-1.5">
+            <span className="block truncate text-xs font-semibold">
+              {title}
+            </span>
+            <span className="text-muted-foreground block truncate text-xs">
+              {getAuditEntityLabel(row.original.entity)}
+            </span>
+          </span>
+        );
+      },
+      header: "Activity",
+      id: "activity",
+    }),
+    columnHelper.accessor("actorEmail", {
+      cell: ({ row }) => (
+        <span className="text-muted-foreground block max-w-[200px] truncate px-2 py-1.5 text-xs">
+          {row.original.actorEmail ?? "System"}
+          {row.original.actorRole ? ` · ${row.original.actorRole}` : null}
+        </span>
+      ),
+      header: "Actor",
+    }),
+    columnHelper.display({
+      cell: ({ row }) => (
+        <span className="text-muted-foreground block max-w-[260px] truncate px-2 py-1.5 text-xs">
+          {getAuditSummary(row.original.diffs)}
+        </span>
+      ),
+      header: "Change",
+      id: "change",
+    }),
+    columnHelper.display({
+      cell: ({ row }) => {
+        const expanded = expandedId === row.original.id;
+        return (
+          <span className="block px-2 py-1.5">
+            <Button
+              aria-expanded={expanded}
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleRow(row.original.id);
+              }}
+              size="sm"
+              type="button"
+              variant="ghost">
+              {expanded ? "Hide" : "Details"}
+            </Button>
+          </span>
+        );
+      },
+      header: "",
+      id: "details",
+    }),
+  ]);
+
+  const table = useLegacyTable({
+    columns: auditColumns,
+    data: rows,
+    getCoreRowModel: getCoreRowModel(),
+    getRowId: (row) => row.id,
+  });
+
   return (
     <div className="overflow-hidden rounded-xl border">
-      <Table className="min-w-[720px]">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Time</TableHead>
-            <TableHead>Activity</TableHead>
-            <TableHead>Actor</TableHead>
-            <TableHead>Change</TableHead>
-            <TableHead aria-label="Details" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length > 0 ?
-            rows.map((row) => {
-              const expanded = expandedId === row.id;
-              const title = getAuditTitle(row.entity, row.action);
-              const summary = getAuditSummary(row.diffs);
-              return (
-                <TableRow
-                  className="hover:bg-muted/40 cursor-pointer"
-                  key={row.id}
-                  onClick={() => toggleRow(row.id)}
-                  onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget) {
-                      return;
-                    }
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      toggleRow(row.id);
-                    }
-                  }}
-                  tabIndex={0}>
-                  <TableCell className="text-muted-foreground px-2 py-1.5 whitespace-nowrap">
-                    <time
-                      dateTime={row.createdAt}
-                      title={row.createdAtDisplay}>
-                      {getRelativeTime(row.createdAt)}
-                    </time>
-                  </TableCell>
-                  <TableCell className="max-w-[280px] px-2 py-1.5">
-                    <span className="block truncate text-xs font-semibold">
-                      {title}
-                    </span>
-                    <span className="text-muted-foreground block truncate text-xs">
-                      {getAuditEntityLabel(row.entity)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground max-w-[200px] truncate px-2 py-1.5 text-xs">
-                    {row.actorEmail ?? "System"}
-                    {row.actorRole ? ` · ${row.actorRole}` : null}
-                  </TableCell>
-                  <TableCell className="max-w-[260px] px-2 py-1.5">
-                    <span className="text-muted-foreground block truncate text-xs">
-                      {summary}
-                    </span>
-                    {expanded ?
-                      <span
-                        className="mt-1.5 flex min-w-[260px] flex-col gap-1"
-                        onClick={(event) => event.stopPropagation()}>
-                        {row.diffs.length > 0 ?
-                          <span className="flex flex-col gap-1 text-xs">
-                            {row.diffs.map((diff) => (
-                              <span
-                                className="rounded-md border px-2 py-1"
-                                key={diff.field}>
-                                <span className="font-semibold">
-                                  {getAuditFieldLabel(diff.field)}
-                                </span>
-                                <span className="text-muted-foreground">
-                                  {`: ${formatAuditValue(diff.before)} to ${formatAuditValue(diff.after)}`}
-                                </span>
-                              </span>
-                            ))}
-                          </span>
-                        : <span className="text-muted-foreground text-xs">
-                            No field changes
-                          </span>
-                        }
+      <DataTable
+        emptyMessage={
+          hasFilter ?
+            "No audit rows match these filters."
+          : "No audit rows yet. Actions will appear here."
+        }
+        isRowExpanded={(rowId) => expandedId === rowId}
+        minWidthClass="min-w-[720px]"
+        onRowToggle={toggleRow}
+        renderExpandedRow={(row) => {
+          const diffs = row.original.diffs;
+          return (
+            <span
+              className="mt-1.5 flex min-w-[260px] flex-col gap-1 px-2 py-1.5"
+              onClick={(event) => event.stopPropagation()}>
+              {diffs.length > 0 ?
+                <span className="flex flex-col gap-1 text-xs">
+                  {diffs.map((diff) => (
+                    <span
+                      className="rounded-md border px-2 py-1"
+                      key={diff.field}>
+                      <span className="font-semibold">
+                        {getAuditFieldLabel(diff.field)}
                       </span>
-                    : null}
-                  </TableCell>
-                  <TableCell className="px-2 py-1.5">
-                    <Button
-                      aria-expanded={expanded}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        toggleRow(row.id);
-                      }}
-                      size="sm"
-                      type="button"
-                      variant="ghost">
-                      {expanded ? "Hide" : "Details"}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })
-          : <TableRow>
-              <TableCell
-                className="h-24 text-center"
-                colSpan={5}>
-                {hasFilter ?
-                  "No audit rows match these filters."
-                : "No audit rows yet. Actions will appear here."}
-              </TableCell>
-            </TableRow>
-          }
-        </TableBody>
-      </Table>
-      <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-muted-foreground text-sm">
-          Showing {rows.length} of {total} audit rows. Page {page} of{" "}
-          {totalPages}.
-        </p>
-        <div className="flex items-center gap-2">
-          <Button
-            disabled={page <= 1}
-            onClick={() => router.replace(prevHref)}
-            size="sm"
-            type="button"
-            variant="outline">
-            Previous
-          </Button>
-          <Button
-            disabled={page >= totalPages}
-            onClick={() => router.replace(nextHref)}
-            size="sm"
-            type="button"
-            variant="outline">
-            Next
-          </Button>
-        </div>
-      </div>
+                      <span className="text-muted-foreground">
+                        {`: ${formatAuditValue(diff.before)} to ${formatAuditValue(diff.after)}`}
+                      </span>
+                    </span>
+                  ))}
+                </span>
+              : <span className="text-muted-foreground text-xs">
+                  No field changes
+                </span>
+              }
+            </span>
+          );
+        }}
+        table={table}
+      />
+      <DataTablePagination
+        onNext={() => router.replace(nextHref)}
+        onPrevious={() => router.replace(prevHref)}
+        page={page}
+        pageLabel={`Showing ${rows.length} of ${total} audit rows. Page ${page} of ${totalPages}.`}
+        totalPages={totalPages}
+      />
     </div>
   );
 };

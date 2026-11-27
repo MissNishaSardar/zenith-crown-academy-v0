@@ -3,18 +3,11 @@
 import { usePathname, useRouter } from "next/navigation";
 
 import type { SortingState } from "@tanstack/react-table";
-import { flexRender } from "@tanstack/react-table";
 import { getCoreRowModel, useLegacyTable } from "@tanstack/react-table/legacy";
 import type { Route } from "next";
-import { Button } from "@/components/shadcnui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/shadcnui/table";
+import DataTable, {
+  DataTablePagination,
+} from "@/components/DataTable/DataTable";
 
 import { usersColumns, type UsersRow } from "./UsersColumns";
 
@@ -127,67 +120,18 @@ const UsersDataTable = ({
 
   return (
     <div className="overflow-hidden rounded-xl border">
-      <Table className="min-w-[760px]">
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder ? null : (
-                    flexRender(
-                      header.column.columnDef.header,
-                      header.getContext(),
-                    )
-                  )}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows.length > 0 ?
-            table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
-          : <TableRow>
-              <TableCell
-                className="h-24 text-center"
-                colSpan={usersColumns.length}>
-                No users match these filters.
-              </TableCell>
-            </TableRow>
-          }
-        </TableBody>
-      </Table>
-      <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-muted-foreground text-sm">
-          Showing {rows.length} of {total} users. Page {page} of {totalPages}.
-        </p>
-        <div className="flex items-center gap-2">
-          <Button
-            disabled={page <= 1}
-            onClick={() => router.replace(prevHref)}
-            size="sm"
-            type="button"
-            variant="outline">
-            Previous
-          </Button>
-          <Button
-            disabled={page >= totalPages}
-            onClick={() => router.replace(nextHref)}
-            size="sm"
-            type="button"
-            variant="outline">
-            Next
-          </Button>
-        </div>
-      </div>
+      <DataTable
+        emptyMessage="No users match these filters."
+        minWidthClass="min-w-[760px]"
+        table={table}
+      />
+      <DataTablePagination
+        onNext={() => router.replace(nextHref)}
+        onPrevious={() => router.replace(prevHref)}
+        page={page}
+        pageLabel={`Showing ${rows.length} of ${total} users. Page ${page} of ${totalPages}.`}
+        totalPages={totalPages}
+      />
     </div>
   );
 };

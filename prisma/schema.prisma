@@ -22,11 +22,21 @@ model User {
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
+  userRoles     UserRole[]
 
   role       String    @default("student")
+  activeRole String?
   banned     Boolean   @default(false)
   banReason  String?
   banExpires DateTime?
+
+  requestedApprovals ApprovalRequest[] @relation("RequestedApprovals")
+  decidedApprovals   ApprovalRequest[] @relation("DecidedApprovals")
+  appliedApprovals   ApprovalRequest[] @relation("AppliedApprovals")
+
+  staffProfile    StaffProfile?   @relation("StaffProfileUser")
+  guardianProfile Guardian?       @relation("GuardianUser")
+  studentProfile  StudentProfile? @relation("StudentUser")
 
   username String?
   @@unique([email])
@@ -117,4 +127,378 @@ model SchoolSettings {
   logoPath     String?
 
   @@map("school_settings")
+}
+
+enum AcademicYearStatus {
+  UPCOMING
+  CURRENT
+  CLOSED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  APPLIED
+  FAILED
+  EXPIRED
+}
+
+enum WorkingDayType {
+  HOLIDAY
+  EXAM_BREAK
+  WORKING_SATURDAY
+}
+
+enum ClassBand {
+  PRE_PRIMARY
+  PRIMARY
+  MIDDLE
+  SECONDARY
+  SENIOR_SECONDARY
+}
+
+model Role {
+  id        String     @id @default(cuid())
+  slug      String     @unique
+  label     String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  assignments UserRole[]
+
+  @@map("role")
+}
+
+model UserRole {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  isPrimary  Boolean  @default(false)
+  assignedBy String?
+  assignedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_role")
+}
+
+model AcademicYear {
+  id        String             @id @default(cuid())
+  name      String             @unique
+  startDate DateTime
+  endDate   DateTime
+  status    AcademicYearStatus @default(UPCOMING)
+  // DB guard for single CURRENT year. Set to "CURRENT" when status is
+  // CURRENT, else null. Nulls do not conflict, so only one CURRENT row
+  // can exist even under concurrent writes.
+  currentGuard String? @unique
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  days      WorkingDay[]
+  sections  Section[]
+  students  StudentProfile[]
+
+  @@map("academic_year")
+}
+
+model WorkingDay {
+  id     String         @id @default(cuid())
+  yearId String
+  year   AcademicYear   @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  date   DateTime
+  type   WorkingDayType
+  note   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([yearId, date])
+  @@index([yearId])
+  @@map("working_day")
+}
+
+model ApprovalRequest {
+  id          String         @id @default(cuid())
+  action      String
+  payload     Json
+  status      ApprovalStatus @default(PENDING)
+  requestedBy String
+  requester   User           @relation("RequestedApprovals", fields: [requestedBy], references: [id], onDelete: Cascade)
+  decidedBy   String?
+  decider     User?          @relation("DecidedApprovals", fields: [decidedBy], references: [id], onDelete: SetNull)
+  decidedAt   DateTime?
+  appliedBy   String?
+  applier     User?          @relation("AppliedApprovals", fields: [appliedBy], references: [id], onDelete: SetNull)
+  appliedAt   DateTime?
+  meetingId   String?
+  reason      String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status])
+  @@index([action])
+  @@index([requestedBy])
+  @@map("approval_request")
+}
+
+model Delegation {
+  id        String   @id @default(cuid())
+  fromId    String
+  toId      String
+  scope     String
+  startAt   DateTime
+  endAt     DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([toId])
+  @@index([fromId])
+  @@map("delegation")
+}
+
+model SchoolClass {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  order    Int       @unique
+  band     ClassBand
+  isActive Boolean   @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sections Section[]
+  classSubjects ClassSubject[]
+  streams Stream[]
+  students StudentProfile[]
+
+  @@index([order])
+  @@map("school_class")
+}
+
+model Subject {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  classLinks ClassSubject[]
+  streamLinks StreamSubject[]
+
+  @@map("subject")
+}
+
+model ClassSubject {
+  id        String     @id @default(cuid())
+  classId   String
+  class     SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  isOptional Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([classId, subjectId])
+  @@index([classId])
+  @@index([subjectId])
+  @@map("class_subject")
+}
+
+model Stream {
+  id        String   @id @default(cuid())
+  classId   String
+  class     SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  subjects  StreamSubject[]
+
+  @@unique([classId, name])
+  @@index([classId])
+  @@map("stream")
+}
+
+model StreamSubject {
+  id        String  @id @default(cuid())
+  streamId  String
+  stream    Stream  @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([streamId, subjectId])
+  @@index([streamId])
+  @@index([subjectId])
+  @@map("stream_subject")
+}
+
+model Section {
+  id             String      @id @default(cuid())
+  yearId         String
+  year           AcademicYear @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  classId        String
+  class          SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  name           String
+  capacity       Int
+  classTeacherId String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  students       StudentProfile[]
+
+  @@unique([yearId, classId, name])
+  @@index([yearId])
+  @@index([classId])
+  @@map("section")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum GuardianRelation {
+  FATHER
+  MOTHER
+  GUARDIAN
+  SIBLING
+  GRANDPARENT
+  OTHER
+}
+
+enum StudentAdmissionStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+}
+
+model StaffProfile {
+  id            String   @id @default(cuid())
+  employeeId    String   @unique
+  firstName     String
+  lastName      String
+  phone         String
+  email         String?
+  address       String
+  designation   String
+  joiningDate   DateTime
+  isActive      Boolean  @default(true)
+  userId        String?  @unique
+  user          User?    @relation("StaffProfileUser", fields: [userId], references: [id], onDelete: SetNull)
+  wardStudentId String?
+  wardStudent   StudentProfile? @relation("StaffWard", fields: [wardStudentId], references: [id], onDelete: SetNull)
+  wardNote      String?
+  wardDeclaredBy String?
+  wardDeclaredAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([phone])
+  @@index([userId])
+  @@index([wardStudentId])
+  @@map("staff_profile")
+}
+
+model Guardian {
+  id           String            @id @default(cuid())
+  name         String
+  phone        String
+  email        String?
+  relation     GuardianRelation
+  relationNote String?
+  address      String
+  userId       String?           @unique
+  user         User?             @relation("GuardianUser", fields: [userId], references: [id], onDelete: SetNull)
+  studentLinks StudentGuardianLink[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([phone])
+  @@index([email])
+  @@index([userId])
+  @@map("guardian")
+}
+
+model StudentProfile {
+  id              String                  @id @default(cuid())
+  admissionNo     String                  @unique
+  firstName       String
+  lastName        String
+  dob             DateTime
+  gender          Gender
+  address         String
+  photoPath       String?
+  previousSchool  String?
+  admissionStatus StudentAdmissionStatus  @default(ACTIVE)
+  classId         String
+  class           SchoolClass             @relation(fields: [classId], references: [id], onDelete: Restrict)
+  sectionId       String?
+  section         Section?                @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  yearId          String
+  year            AcademicYear            @relation(fields: [yearId], references: [id], onDelete: Restrict)
+  userId          String?                 @unique
+  user            User?                   @relation("StudentUser", fields: [userId], references: [id], onDelete: SetNull)
+  staffWards      StaffProfile[]          @relation("StaffWard")
+  guardianLinks   StudentGuardianLink[]
+  documents       DocumentChecklist[]
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([yearId])
+  @@index([classId])
+  @@index([sectionId])
+  @@index([userId])
+  @@map("student_profile")
+}
+
+enum DocumentType {
+  BIRTH_CERTIFICATE
+  MEDICAL
+  PHOTO
+  TRANSFER_CERTIFICATE
+  CLASS_ITEM
+}
+
+enum DocumentStatus {
+  PENDING
+  COLLECTED
+  VERIFIED
+}
+
+model StudentGuardianLink {
+  id         String   @id @default(cuid())
+  studentId  String
+  student    StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardianId String
+  guardian   Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  isPrimary  Boolean  @default(false)
+  canViewFees Boolean @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([studentId, guardianId])
+  @@index([studentId])
+  @@index([guardianId])
+  @@map("student_guardian_link")
+}
+
+model DocumentChecklist {
+  id        String         @id @default(cuid())
+  studentId String
+  student   StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  docType   DocumentType
+  label     String         @default("")
+  status    DocumentStatus @default(PENDING)
+  note      String?
+  verifiedBy String?
+  verifiedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, docType, label])
+  @@index([studentId])
+  @@map("document_checklist")
 }

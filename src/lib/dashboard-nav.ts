@@ -5,15 +5,21 @@ import {
   BookOpen,
   Briefcase,
   Calculator,
+  CalendarDays,
+  ClipboardCheck,
   Crown,
+  GitBranch,
   GraduationCap,
   HeartHandshake,
   KeyRound,
+  Layers,
   LayoutDashboard,
+  LayoutGrid,
   Library,
   ScrollText,
   Settings,
   ShieldCheck,
+  UserPlus,
   Users,
 } from "lucide-react";
 
@@ -35,6 +41,78 @@ export type DashboardLink = {
   label: string;
   requiredPermission?: Permission;
 };
+
+export type DashboardGroup = {
+  children: DashboardLink[];
+  href: string;
+  icon: LucideIcon;
+  label: string;
+};
+
+// Shared academic routes live under dashboard/academics, never duplicated
+// per role folder. Nav filters by can so union views stay visible while
+// writes stay gated by requireActivePermission. Route entries land in A2.
+export const ACADEMICS_BASE = "/dashboard/academics";
+
+export const ACADEMICS_OVERVIEW_HREF = ACADEMICS_BASE;
+
+export const ACADEMICS_LABEL = "Academics";
+
+// String cast bypasses typedRoutes checking, so every slug above must match
+// a real route directory under app/(dashboard)/dashboard. A renamed folder
+// fails at runtime (404), not at typecheck.
+export const dashboardRoute = (href: string): Route => href as Route;
+
+const academicsLinks: DashboardLink[] = [
+  {
+    href: `${ACADEMICS_BASE}/years`,
+    icon: CalendarDays,
+    label: "Academic years",
+    requiredPermission: "academic:view",
+  },
+  {
+    href: `${ACADEMICS_BASE}/classes`,
+    icon: Layers,
+    label: "Classes",
+    requiredPermission: "academic:view",
+  },
+  {
+    href: `${ACADEMICS_BASE}/sections`,
+    icon: LayoutGrid,
+    label: "Sections",
+    requiredPermission: "academic:view",
+  },
+  {
+    href: `${ACADEMICS_BASE}/subjects`,
+    icon: BookOpen,
+    label: "Subjects",
+    requiredPermission: "academic:view",
+  },
+  {
+    href: `${ACADEMICS_BASE}/streams`,
+    icon: GitBranch,
+    label: "Streams",
+    requiredPermission: "academic:view",
+  },
+  {
+    href: `${ACADEMICS_BASE}/calendar`,
+    icon: CalendarDays,
+    label: "Calendar",
+    requiredPermission: "academic:view",
+  },
+  {
+    href: `${ACADEMICS_BASE}/admissions`,
+    icon: UserPlus,
+    label: "Admissions",
+    requiredPermission: "academic:view",
+  },
+  {
+    href: `${ACADEMICS_BASE}/approvals`,
+    icon: ClipboardCheck,
+    label: "Approvals",
+    requiredPermission: "academic:view",
+  },
+];
 
 const roleIcons: Record<RoleName, LucideIcon> = {
   owner: Crown,
@@ -94,8 +172,9 @@ export const getDashboardLinks = (
       href: "/dashboard/administrator/settings",
       icon: Settings,
       label: "Settings",
-      requiredPermission: "system:view",
+      requiredPermission: "system:manage",
     },
+    ...academicsLinks,
   ];
   return allLinks.filter(
     (link) =>
@@ -103,10 +182,55 @@ export const getDashboardLinks = (
   );
 };
 
+export const getAcademicsLinks = (
+  storedRole: string | null | undefined,
+): DashboardLink[] =>
+  academicsLinks.filter(
+    (link) =>
+      !link.requiredPermission || can(storedRole, link.requiredPermission),
+  );
+
+export const getAcademicsGroup = (
+  storedRole: string | null | undefined,
+): DashboardGroup => ({
+  children: getAcademicsLinks(storedRole),
+  href: ACADEMICS_OVERVIEW_HREF,
+  icon: BookOpen,
+  label: ACADEMICS_LABEL,
+});
+
+export const isAcademicsHref = (href: string): boolean =>
+  href === ACADEMICS_BASE || href.startsWith(`${ACADEMICS_BASE}/`);
+
+export const isAcademicsPath = (pathname: string | null): boolean =>
+  pathname === ACADEMICS_BASE ||
+  (pathname?.startsWith(`${ACADEMICS_BASE}/`) ?? false);
+
+export const getAcademicsTrail = (
+  currentLabel: string,
+): { href?: Route; label: string }[] => [
+  { href: dashboardRoute("/dashboard"), label: "Dashboard" },
+  { href: dashboardRoute(ACADEMICS_OVERVIEW_HREF), label: ACADEMICS_LABEL },
+  { label: currentLabel },
+];
+
+export const getAcademicsLandingTrail = (): {
+  href?: Route;
+  label: string;
+}[] => [
+  { href: dashboardRoute("/dashboard"), label: "Dashboard" },
+  { label: ACADEMICS_LABEL },
+];
+
 export const resolveActiveRole = (
   storedRole: string | null | undefined,
   pathname: string | null,
+  activeRole?: string | null | undefined,
 ): RoleName => {
+  const held = parseRoleNames(storedRole);
+  if (activeRole && held.includes(activeRole as RoleName)) {
+    return activeRole as RoleName;
+  }
   const fallback = firstRoleName(storedRole);
   if (!pathname) {
     return fallback;
@@ -118,10 +242,5 @@ export const resolveActiveRole = (
   if (!match) {
     return fallback;
   }
-  return parseRoleNames(storedRole).includes(match) ? match : fallback;
+  return held.includes(match) ? match : fallback;
 };
-
-// String cast bypasses typedRoutes checking, so every slug above must match
-// a real route directory under app/(dashboard)/dashboard. A renamed folder
-// fails at runtime (404), not at typecheck.
-export const dashboardRoute = (href: string): Route => href as Route;

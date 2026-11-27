@@ -23,7 +23,6 @@ import {
 } from "@/server/admin/settingsActions";
 
 type SchoolSettingsFormProps = {
-  canEdit: boolean;
   initialLogoPath: string | null;
   initialValues: schoolSettingsType;
 };
@@ -44,7 +43,6 @@ const normalizePhoneDisplay = (value: string): string => {
 };
 
 const SchoolSettingsForm = ({
-  canEdit,
   initialLogoPath,
   initialValues,
 }: SchoolSettingsFormProps) => {
@@ -147,7 +145,7 @@ const SchoolSettingsForm = ({
   };
 
   const displayLogo = previewUrl ?? logoPath;
-  const dropActive = dragOver && canEdit && !uploading;
+  const dropActive = dragOver && !uploading;
 
   const selectLogoFile = (next: File | null) => {
     setLogoError(null);
@@ -163,7 +161,7 @@ const SchoolSettingsForm = ({
   };
 
   const openFilePicker = () => {
-    if (!canEdit || uploading) {
+    if (uploading) {
       return;
     }
     fileInputRef.current?.click();
@@ -171,11 +169,6 @@ const SchoolSettingsForm = ({
 
   return (
     <div className="flex flex-col gap-6">
-      {!canEdit ?
-        <p className="bg-muted rounded-xl px-4 py-3 text-sm">
-          You can view settings. Editing needs administrator access.
-        </p>
-      : null}
       <div className="grid grid-cols-1 gap-7 rounded-xl border p-7 sm:grid-cols-[168px_1fr]">
         <div>
           <div className="bg-muted flex size-32 items-center justify-center overflow-hidden rounded-xl border sm:size-[168px]">
@@ -202,9 +195,9 @@ const SchoolSettingsForm = ({
         <div className="min-w-0">
           <div
             role="button"
-            tabIndex={canEdit && !uploading ? 0 : -1}
+            tabIndex={!uploading ? 0 : -1}
             aria-label="Drag the new mark here or pick a file from the device"
-            aria-disabled={!canEdit || uploading}
+            aria-disabled={uploading}
             onClick={openFilePicker}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
@@ -213,7 +206,7 @@ const SchoolSettingsForm = ({
               }
             }}
             onDragOver={(event) => {
-              if (!canEdit || uploading) {
+              if (uploading) {
                 return;
               }
               event.preventDefault();
@@ -221,7 +214,7 @@ const SchoolSettingsForm = ({
             }}
             onDragLeave={() => setDragOver(false)}
             onDrop={(event) => {
-              if (!canEdit || uploading) {
+              if (uploading) {
                 return;
               }
               event.preventDefault();
@@ -249,7 +242,7 @@ const SchoolSettingsForm = ({
             type="file"
             accept="image/jpeg,image/png,image/webp"
             hidden
-            disabled={!canEdit || uploading}
+            disabled={uploading}
             onChange={(event) => {
               selectLogoFile(event.target.files?.[0] ?? null);
               event.target.value = "";
@@ -285,7 +278,7 @@ const SchoolSettingsForm = ({
             </div>
             <Button
               type="button"
-              disabled={!canEdit || !selectedFile || uploading}
+              disabled={!selectedFile || uploading}
               onClick={handleUpload}
               className="ml-auto">
               {uploading ?
@@ -336,7 +329,6 @@ const SchoolSettingsForm = ({
                   type="text"
                   autoComplete="off"
                   placeholder="Zenith Crown Academy"
-                  disabled={!canEdit}
                   aria-invalid={fieldState.invalid}
                 />
                 <FieldError errors={[fieldState.error]} />
@@ -355,7 +347,6 @@ const SchoolSettingsForm = ({
                   type="text"
                   autoComplete="off"
                   placeholder="Rise to the highest point"
-                  disabled={!canEdit}
                   aria-invalid={fieldState.invalid}
                 />
                 <FieldError errors={[fieldState.error]} />
@@ -374,7 +365,6 @@ const SchoolSettingsForm = ({
                   type="text"
                   autoComplete="off"
                   placeholder="12 Crown Road"
-                  disabled={!canEdit}
                   aria-invalid={fieldState.invalid}
                 />
                 <FieldError errors={[fieldState.error]} />
@@ -393,7 +383,6 @@ const SchoolSettingsForm = ({
                   type="tel"
                   autoComplete="off"
                   placeholder="+91 9876543210"
-                  disabled={!canEdit}
                   aria-invalid={fieldState.invalid}
                   onBlur={() => {
                     const normalized = normalizePhoneDisplay(field.value);
@@ -419,7 +408,6 @@ const SchoolSettingsForm = ({
                   type="email"
                   autoComplete="off"
                   placeholder="info@school.edu"
-                  disabled={!canEdit}
                   aria-invalid={fieldState.invalid}
                 />
                 <FieldError errors={[fieldState.error]} />
@@ -438,7 +426,6 @@ const SchoolSettingsForm = ({
                   type="text"
                   autoComplete="off"
                   placeholder="2026/2027"
-                  disabled={!canEdit}
                   aria-invalid={fieldState.invalid}
                 />
                 <FieldError errors={[fieldState.error]} />
@@ -456,7 +443,7 @@ const SchoolSettingsForm = ({
         <div className="mt-5 flex justify-end">
           <Button
             type="submit"
-            disabled={!canEdit || !isDirty || isSubmitting}>
+            disabled={!isDirty || isSubmitting}>
             {isSubmitting ?
               <>
                 <Loader2Icon

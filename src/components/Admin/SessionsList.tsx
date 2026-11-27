@@ -5,6 +5,8 @@ import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { getCoreRowModel, useLegacyTable } from "@tanstack/react-table/legacy";
+import { legacyCreateColumnHelper } from "@tanstack/react-table/legacy";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -16,14 +18,9 @@ import {
 } from "@/components/shadcnui/alert-dialog";
 import { Badge } from "@/components/shadcnui/badge";
 import { Button } from "@/components/shadcnui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/shadcnui/table";
+import DataTable, {
+  DataTablePagination,
+} from "@/components/DataTable/DataTable";
 import {
   firstRoleName,
   parseRoleNames,
@@ -74,6 +71,8 @@ type SessionsListProps = {
   total: number;
   totalPages: number;
 };
+
+const columnHelper = legacyCreateColumnHelper<SessionRow>();
 
 const SessionsList = ({
   clearedExpired,
@@ -156,6 +155,117 @@ const SessionsList = ({
     return null;
   };
 
+  const sessionColumns = columnHelper.columns([
+    columnHelper.display({
+      cell: ({ row }) => (
+        <span className="flex flex-col">
+          <span className="font-medium">{row.original.user.name}</span>
+          <span className="text-muted-foreground text-xs">
+            {row.original.user.email} ·{" "}
+            {roleLabels[firstRoleName(row.original.user.role)]}
+          </span>
+        </span>
+      ),
+      header: "User",
+      id: "user",
+    }),
+    columnHelper.display({
+      cell: ({ row }) => {
+        const session = row.original;
+        return (
+          session.isCurrent ? <Badge>This device</Badge>
+          : session.isExpired ? <Badge variant="outline">Expired</Badge>
+          : <Badge variant="secondary">Active</Badge>
+        );
+      },
+      header: "Status",
+      id: "status",
+    }),
+    columnHelper.accessor("createdAt", {
+      cell: ({ getValue }) => (
+        <span className="text-muted-foreground">
+          {formatDateDisplay(getValue())}
+        </span>
+      ),
+      header: "Created",
+    }),
+    columnHelper.accessor("expiresAt", {
+      cell: ({ getValue }) => (
+        <span className="text-muted-foreground">
+          {formatDateDisplay(getValue())}
+        </span>
+      ),
+      header: "Expires",
+    }),
+    columnHelper.accessor("ipAddress", {
+      cell: ({ getValue }) => {
+        const value = getValue();
+        return (
+          <span
+            className="text-muted-foreground"
+            title={value ?? undefined}>
+            {formatIpAddress(value)}
+          </span>
+        );
+      },
+      header: "IP address",
+    }),
+    columnHelper.accessor("userAgent", {
+      cell: ({ getValue }) => {
+        const value = getValue();
+        return (
+          <span
+            className="text-muted-foreground block max-w-48 truncate"
+            title={value ?? undefined}>
+            {value ?? "Unknown"}
+          </span>
+        );
+      },
+      header: "Device",
+    }),
+    columnHelper.display({
+      cell: ({ row }) => {
+        const session = row.original;
+        const isOwner = parseRoleNames(session.user.role).includes("owner");
+        const rowDisabled = session.isCurrent || session.isExpired;
+        return isOwner ?
+            <Badge
+              variant="outline"
+              title="Owner accounts cannot be changed here"
+              aria-label="Protected: owner accounts cannot be changed here">
+              <LockIcon aria-hidden="true" />
+              Protected
+            </Badge>
+          : <Button
+              disabled={rowDisabled}
+              onClick={() => {
+                setTarget(session);
+                setError(null);
+              }}
+              size="sm"
+              type="button"
+              variant="outline"
+              title={
+                session.isCurrent ? "This is your current session"
+                : session.isExpired ?
+                  "This session already expired"
+                : `Revoke session for ${session.user.name}`
+              }>
+              Revoke
+            </Button>;
+      },
+      header: "",
+      id: "actions",
+    }),
+  ]);
+
+  const table = useLegacyTable({
+    columns: sessionColumns,
+    data: rows,
+    getCoreRowModel: getCoreRowModel(),
+    getRowId: (row) => row.id,
+  });
+
   return (
     <div className="flex flex-col gap-4">
       <section
@@ -224,131 +334,18 @@ const SessionsList = ({
         </ul>
       </section>
       <div className="overflow-hidden rounded-xl border">
-        <Table className="min-w-[760px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead>Expires</TableHead>
-              <TableHead>IP address</TableHead>
-              <TableHead>Device</TableHead>
-              <TableHead aria-label="Actions" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length > 0 ?
-              rows.map((row) => {
-                const isOwner = parseRoleNames(row.user.role).includes("owner");
-                const rowDisabled = row.isCurrent || row.isExpired;
-                return (
-                  <TableRow key={row.id}>
-                    <TableCell>
-                      <span className="flex flex-col">
-                        <span className="font-medium">{row.user.name}</span>
-                        <span className="text-muted-foreground text-xs">
-                          {row.user.email} ·{" "}
-                          {roleLabels[firstRoleName(row.user.role)]}
-                        </span>
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {row.isCurrent ?
-                        <Badge>This device</Badge>
-                      : row.isExpired ?
-                        <Badge variant="outline">Expired</Badge>
-                      : <Badge variant="secondary">Active</Badge>}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground">
-                        {formatDateDisplay(row.createdAt)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground">
-                        {formatDateDisplay(row.expiresAt)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className="text-muted-foreground"
-                        title={row.ipAddress ?? undefined}>
-                        {formatIpAddress(row.ipAddress)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className="text-muted-foreground block max-w-48 truncate"
-                        title={row.userAgent ?? undefined}>
-                        {row.userAgent ?? "Unknown"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {isOwner ?
-                        <Badge
-                          variant="outline"
-                          title="Owner accounts cannot be changed here"
-                          aria-label="Protected: owner accounts cannot be changed here">
-                          <LockIcon aria-hidden="true" />
-                          Protected
-                        </Badge>
-                      : <Button
-                          disabled={rowDisabled}
-                          onClick={() => {
-                            setTarget(row);
-                            setError(null);
-                          }}
-                          size="sm"
-                          type="button"
-                          variant="outline"
-                          title={
-                            row.isCurrent ? "This is your current session"
-                            : row.isExpired ?
-                              "This session already expired"
-                            : `Revoke session for ${row.user.name}`
-                          }>
-                          Revoke
-                        </Button>
-                      }
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            : <TableRow>
-                <TableCell
-                  className="h-24 text-center"
-                  colSpan={7}>
-                  No sessions found.
-                </TableCell>
-              </TableRow>
-            }
-          </TableBody>
-        </Table>
-        <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-muted-foreground text-sm">
-            Showing {rows.length} of {total} active sessions. Page {page} of{" "}
-            {totalPages}
-            {clearedExpired > 0 ? `, ${clearedExpired} expired cleared.` : "."}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              disabled={page <= 1}
-              onClick={() => router.replace(prevHref)}
-              size="sm"
-              type="button"
-              variant="outline">
-              Previous
-            </Button>
-            <Button
-              disabled={page >= totalPages}
-              onClick={() => router.replace(nextHref)}
-              size="sm"
-              type="button"
-              variant="outline">
-              Next
-            </Button>
-          </div>
-        </div>
+        <DataTable
+          emptyMessage="No sessions found."
+          minWidthClass="min-w-[760px]"
+          table={table}
+        />
+        <DataTablePagination
+          onNext={() => router.replace(nextHref)}
+          onPrevious={() => router.replace(prevHref)}
+          page={page}
+          pageLabel={`Showing ${rows.length} of ${total} active sessions. Page ${page} of ${totalPages}${clearedExpired > 0 ? `, ${clearedExpired} expired cleared.` : "."}`}
+          totalPages={totalPages}
+        />
         <AlertDialog
           open={target !== null}
           onOpenChange={handleDialogChange}>

@@ -124,7 +124,9 @@ const ROLE_STATEMENTS: Record<RoleKey, RoleStatement> = {
   student: {},
   parent: {},
   accountant: {},
-  office_staff: {},
+  office_staff: {
+    academic: ["view", "view-reports"],
+  },
   librarian: {},
 };
 
@@ -311,6 +313,28 @@ export const roleUrlSlug = (role: RoleName): string => roleUrlSlugs[role];
 
 export const resolveRolePath = (role: string | null | undefined): string =>
   `/dashboard/${roleUrlSlugs[firstRoleName(role)]}`;
+
+// Twelve approval action names for the academic engine. Executors are filled
+// per slice. Keep this list as the single source of truth.
+export const APPROVAL_ACTIONS = [
+  "admission",
+  "marks_submit",
+  "marks_reopen",
+  "promotion_apply",
+  "timetable_change",
+  "transfer",
+  "withdrawal",
+  "attendance_backdate_reopen",
+  "curriculum_locked_edit",
+  "attendance_floor_exception",
+  "fee_concession",
+  "hire",
+] as const;
+
+export type ApprovalActionName = (typeof APPROVAL_ACTIONS)[number];
+
+export const isApprovalAction = (value: string): value is ApprovalActionName =>
+  (APPROVAL_ACTIONS as readonly string[]).includes(value);
 
 // App level permission strings in singular form so server code matches the
 // Better Auth statement without a second vocabulary.

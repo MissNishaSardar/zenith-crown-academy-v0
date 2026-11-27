@@ -3,8 +3,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { BookOpen, ChevronDown } from "lucide-react";
 
-import { dashboardRoute, type DashboardLink } from "@/lib/dashboard-nav";
+import {
+  ACADEMICS_LABEL,
+  ACADEMICS_OVERVIEW_HREF,
+  dashboardRoute,
+  isAcademicsHref,
+  isAcademicsPath,
+  type DashboardLink,
+} from "@/lib/dashboard-nav";
 import { FALLBACK_SCHOOL_NAME } from "@/lib/school-branding-constants";
 import { cn } from "@/lib/utils";
 
@@ -83,12 +92,77 @@ const SidebarNav = ({
   onNavigate?: () => void;
 }) => {
   const pathname = usePathname();
+  const [userExpanded, setUserExpanded] = useState(true);
+  const pathnameIsAcademics = isAcademicsPath(pathname);
+  const standaloneLinks = links.filter((link) => !isAcademicsHref(link.href));
+  const academicsLinks = links.filter((link) => isAcademicsHref(link.href));
+  const groupOpen = pathnameIsAcademics ? true : userExpanded;
+
+  if (collapsed) {
+    const landingActive = pathname === ACADEMICS_OVERVIEW_HREF;
+    const renderIconLink = (
+      href: string,
+      label: string,
+      Icon: typeof BookOpen,
+      isActive: boolean,
+    ) => (
+      <Link
+        key={href}
+        href={dashboardRoute(href)}
+        aria-current={isActive ? "page" : undefined}
+        aria-label={label}
+        title={label}
+        onClick={onNavigate}
+        className={cn(
+          "flex w-full items-center justify-center rounded-md px-0 py-2 text-sm font-medium transition-colors",
+          isActive ?
+            "bg-secondary text-secondary-foreground"
+          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+        )}>
+        <Icon
+          aria-hidden="true"
+          className="size-5 shrink-0"
+        />
+        <span className="sr-only">{label}</span>
+      </Link>
+    );
+    return (
+      <nav
+        aria-label="Dashboard sections"
+        className="flex w-full flex-col gap-1 px-2">
+        {standaloneLinks.map((link) =>
+          renderIconLink(
+            link.href,
+            link.label,
+            link.icon,
+            pathname === link.href,
+          ),
+        )}
+        {academicsLinks.length > 0 ?
+          renderIconLink(
+            ACADEMICS_OVERVIEW_HREF,
+            ACADEMICS_LABEL,
+            BookOpen,
+            landingActive,
+          )
+        : null}
+        {academicsLinks.map((link) =>
+          renderIconLink(
+            link.href,
+            link.label,
+            link.icon,
+            pathname === link.href,
+          ),
+        )}
+      </nav>
+    );
+  }
 
   return (
     <nav
       aria-label="Dashboard sections"
       className="flex w-full flex-col gap-1 px-2">
-      {links.map((link) => {
+      {standaloneLinks.map((link) => {
         const Icon = link.icon;
         const isActive = pathname === link.href;
         return (
@@ -97,25 +171,96 @@ const SidebarNav = ({
             href={dashboardRoute(link.href)}
             aria-current={isActive ? "page" : undefined}
             aria-label={link.label}
-            title={collapsed ? link.label : undefined}
             onClick={onNavigate}
             className={cn(
               "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               isActive ?
                 "bg-secondary text-secondary-foreground"
               : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-              collapsed && "justify-center px-0",
             )}>
             <Icon
               aria-hidden="true"
               className="size-5 shrink-0"
             />
-            <span className={cn("truncate", collapsed && "sr-only")}>
-              {link.label}
-            </span>
+            <span className="truncate">{link.label}</span>
           </Link>
         );
       })}
+      {academicsLinks.length > 0 ?
+        <div className="flex w-full flex-col gap-1">
+          <div
+            className={cn(
+              "flex w-full items-center gap-1 rounded-md transition-colors",
+              pathnameIsAcademics ?
+                "bg-secondary text-secondary-foreground"
+              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            )}>
+            <Link
+              href={dashboardRoute(ACADEMICS_OVERVIEW_HREF)}
+              aria-current={
+                pathname === ACADEMICS_OVERVIEW_HREF ? "page" : undefined
+              }
+              aria-label={ACADEMICS_LABEL}
+              onClick={onNavigate}
+              className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm font-medium">
+              <BookOpen
+                aria-hidden="true"
+                className="size-5 shrink-0"
+              />
+              <span className="flex-1 truncate text-left">
+                {ACADEMICS_LABEL}
+              </span>
+            </Link>
+            <button
+              type="button"
+              aria-expanded={groupOpen}
+              aria-controls="academics-nav-group"
+              aria-label="Toggle Academics section"
+              onClick={() => setUserExpanded((previous) => !previous)}
+              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors">
+              <ChevronDown
+                aria-hidden="true"
+                className={cn(
+                  "size-4 shrink-0 transition-transform",
+                  groupOpen && "rotate-180",
+                )}
+              />
+            </button>
+          </div>
+          {groupOpen ?
+            <div
+              id="academics-nav-group"
+              role="group"
+              aria-label={ACADEMICS_LABEL}
+              className="flex w-full flex-col gap-1 pl-4">
+              {academicsLinks.map((link) => {
+                const Icon = link.icon;
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={dashboardRoute(link.href)}
+                    aria-current={isActive ? "page" : undefined}
+                    aria-label={link.label}
+                    onClick={onNavigate}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      isActive ?
+                        "bg-secondary text-secondary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    )}>
+                    <Icon
+                      aria-hidden="true"
+                      className="size-5 shrink-0"
+                    />
+                    <span className="truncate">{link.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          : null}
+        </div>
+      : null}
     </nav>
   );
 };
