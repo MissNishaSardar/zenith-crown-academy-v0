@@ -272,6 +272,10 @@ export const AUDIT_ENTITY_OPTIONS = [
   "assignment-submission",
   "curriculum-unit",
   "curriculum-minimum",
+  "exam",
+  "exam-paper",
+  "paper-component",
+  "mark",
 ] as const;
 
 export const AUDIT_USER_ACTION_OPTIONS = [

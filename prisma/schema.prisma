@@ -55,6 +55,8 @@ model User {
   decidedLeaves LeaveRequest[] @relation("LeaveDecider")
   markedStaffAttendance StaffAttendance[] @relation("StaffMarker")
   createdAssignments Assignment[] @relation("AssignmentCreator")
+  enteredMarks     Mark[]           @relation("MarkEnterer")
+  approvedMarks    Mark[]           @relation("MarkApprover")
   @@unique([email])
   @@unique([username])
   @@map("user")
@@ -227,6 +229,7 @@ model AcademicYear {
   assignments Assignment[]
   curriculumUnits CurriculumUnit[]
   curriculumMinimums CurriculumMinimum[]
+  exams              Exam[]
 
   @@map("academic_year")
 }
@@ -309,6 +312,8 @@ model SchoolClass {
   assignments Assignment[]
   curriculumUnits CurriculumUnit[]
   curriculumMinimums CurriculumMinimum[]
+  exams              Exam[]
+  examPapers         ExamPaper[]
 
   @@index([order])
   @@map("school_class")
@@ -328,6 +333,7 @@ model Subject {
   assignments Assignment[]
   curriculumUnits CurriculumUnit[]
   curriculumMinimums CurriculumMinimum[]
+  examPapers         ExamPaper[]
 
   @@map("subject")
 }
@@ -358,6 +364,7 @@ model Stream {
   subjects  StreamSubject[]
   enrollments Enrollment[]
   curriculumUnits CurriculumUnit[]
+  exams           Exam[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -503,6 +510,7 @@ model StudentProfile {
   disciplineIncidents DisciplineIncident[]
   studentLeaves LeaveRequest[] @relation("StudentLeave")
   submissions AssignmentSubmission[]
+  marks       Mark[]
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 
@@ -931,6 +939,39 @@ enum CurriculumSource {
   CBSE_LOCKED
 }
 
+enum ExamName {
+  UNIT_TEST
+  HALF_YEARLY
+  ANNUAL
+  BOARD_PRELIM
+}
+
+enum ExamStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  LOCKED
+  FINALIZED
+}
+
+enum ComponentKind {
+  THEORY
+  PRACTICAL
+  INTERNAL
+}
+
+enum MarkStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+}
+
+enum MarkState {
+  SCORED
+  ABSENT
+  EXEMPT
+}
+
 model CurriculumUnit {
   id         String           @id @default(cuid())
   yearId     String
@@ -970,4 +1011,93 @@ model CurriculumMinimum {
   @@index([yearId])
   @@index([classId])
   @@map("curriculum_minimum")
+}
+
+model Exam {
+  id        String     @id @default(cuid())
+  yearId    String
+  year      AcademicYear @relation(fields: [yearId], references: [id], onDelete: Restrict)
+  name      ExamName
+  classId   String?
+  class     SchoolClass? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  streamId  String?
+  stream    Stream?      @relation(fields: [streamId], references: [id], onDelete: SetNull)
+  startDate DateTime
+  endDate   DateTime
+  status    ExamStatus @default(DRAFT)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  papers    ExamPaper[]
+
+  @@unique([yearId, name, classId, streamId])
+  @@index([yearId])
+  @@index([classId])
+  @@index([streamId])
+  @@index([status])
+  @@map("exam")
+}
+
+model ExamPaper {
+  id             String      @id @default(cuid())
+  examId         String
+  exam           Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  classId        String
+  class          SchoolClass @relation(fields: [classId], references: [id], onDelete: Restrict)
+  subjectId      String
+  subject        Subject     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  date           DateTime
+  maxHundredths  Int
+  passHundredths Int
+  durationMin    Int
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  components     PaperComponent[]
+  marks          Mark[]
+
+  @@unique([examId, classId, subjectId])
+  @@index([examId])
+  @@index([classId])
+  @@index([subjectId])
+  @@map("exam_paper")
+}
+
+model PaperComponent {
+  id             String        @id @default(cuid())
+  paperId        String
+  paper          ExamPaper     @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  kind           ComponentKind
+  maxHundredths  Int
+  passHundredths Int
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([paperId, kind])
+  @@index([paperId])
+  @@map("paper_component")
+}
+
+model Mark {
+  id                  String     @id @default(cuid())
+  paperId             String
+  paper               ExamPaper  @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  studentId           String
+  student             StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  theoryHundredths    Int?
+  practicalHundredths Int?
+  internalHundredths  Int?
+  totalHundredths     Int?
+  state               MarkState  @default(SCORED)
+  status              MarkStatus @default(DRAFT)
+  enteredBy           String
+  enterer             User       @relation("MarkEnterer", fields: [enteredBy], references: [id], onDelete: Restrict)
+  approvedBy          String?
+  approver            User?      @relation("MarkApprover", fields: [approvedBy], references: [id], onDelete: SetNull)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@unique([paperId, studentId])
+  @@index([paperId])
+  @@index([studentId])
+  @@index([status])
+  @@map("mark")
 }

@@ -170,6 +170,18 @@ const academicsLinks: DashboardLink[] = [
     requiredPermission: "academic:view",
   },
   {
+    href: `${ACADEMICS_BASE}/exams`,
+    icon: ClipboardCheck,
+    label: "Exams",
+    requiredPermission: "academic:view",
+  },
+  {
+    href: `${ACADEMICS_BASE}/marks`,
+    icon: GraduationCap,
+    label: "Marks",
+    requiredPermission: "academic:view",
+  },
+  {
     href: `${ACADEMICS_BASE}/leave`,
     icon: Inbox,
     label: "Leave",

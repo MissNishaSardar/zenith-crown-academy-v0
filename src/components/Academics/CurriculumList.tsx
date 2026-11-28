@@ -1,22 +1,33 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2Icon } from "lucide-react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVerticalIcon, Loader2Icon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import type { Route } from "next";
 import Link from "next/link";
-import { getCoreRowModel, useLegacyTable } from "@tanstack/react-table/legacy";
-import { legacyCreateColumnHelper } from "@tanstack/react-table/legacy";
-import { Button } from "@/components/shadcnui/button";
 import { Badge } from "@/components/shadcnui/badge";
+import { Button } from "@/components/shadcnui/button";
 import { Card, CardContent } from "@/components/shadcnui/card";
-import DataTable, {
-  DataTablePagination,
-  DataTableSortButton,
-} from "@/components/DataTable/DataTable";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +47,7 @@ import {
   curriculumLockedEditRequestSchema,
   curriculumMinimumSchema,
   curriculumUnitSchema,
+  isLockedClassOrder,
   MAX_CURRICULUM_MINIMUM,
   MIN_CURRICULUM_MINIMUM,
   type curriculumLockedEditRequestType,
@@ -47,6 +59,7 @@ import {
   createCurriculumUnit,
   decideCurriculumLockedEdit,
   moveCurriculumUnit,
+  reorderCurriculumUnits,
   requestCurriculumLockedEdit,
   setCurriculumMinimum,
   updateCurriculumUnit,
@@ -59,7 +72,6 @@ export type CurriculumRow = {
   classId: string;
   className: string;
   classOrder: number;
-  current: number;
   id: string;
   isLocked: boolean;
   objectives: string | null;
@@ -69,11 +81,48 @@ export type CurriculumRow = {
   source: string;
   streamId: string | null;
   streamName: string;
+  subjectCode: string;
   subjectId: string;
   subjectName: string;
+  subjectShort: string;
   title: string;
   yearId: string;
   yearName: string;
+};
+
+export type CurriculumGroup = {
+  classId: string;
+  className: string;
+  classOrder: number;
+  current: number;
+  key: string;
+  required: number;
+  streamId: string | null;
+  streamName: string;
+  subjectCode: string;
+  subjectId: string;
+  subjectName: string;
+  subjectShort: string;
+  units: CurriculumRow[];
+  yearId: string;
+  yearName: string;
+};
+
+export type CurriculumStats = {
+  below: number;
+  locked: number;
+  meeting: number;
+  total: number;
+  yearLabel: string;
+};
+
+export type CurriculumFilters = {
+  classId: string;
+  search: string;
+  status: string;
+  streamId: string;
+  subjectId: string;
+  yearId: string;
 };
 
 type Option = { id: string; name: string };
@@ -82,48 +131,71 @@ type ClassSubjectLink = { classId: string; subjectId: string };
 
 type StreamSubjectLink = { streamId: string; subjectId: string };
 
-type CurriculumListProps = {
-  canWrite: boolean;
-  classes: (Option & { order: number })[];
-  classSubjects: ClassSubjectLink[];
-  dir: string;
-  page: number;
-  pageSize: number;
-  principalCount: number;
-  rows: CurriculumRow[];
-  sort: string;
-  streams: { classId: string; id: string; name: string }[];
-  streamSubjects: StreamSubjectLink[];
-  subjects: { code: string; id: string; name: string }[];
-  total: number;
-  totalPages: number;
-  years: { id: string; name: string; status: string }[];
-};
-
-const columnHelper = legacyCreateColumnHelper<CurriculumRow>();
-
-const CurriculumUnitDialog = ({
-  canWrite,
-  classes,
-  classSubjects,
-  streams,
-  streamSubjects,
-  subjects,
-  unit,
-  years,
-}: {
-  canWrite: boolean;
+type DialogData = {
   classes: Option[];
   classSubjects: ClassSubjectLink[];
   streams: { classId: string; id: string; name: string }[];
   streamSubjects: StreamSubjectLink[];
   subjects: { code: string; id: string; name: string }[];
-  unit?: CurriculumRow | null;
   years: Option[];
+};
+
+type CurriculumListProps = DialogData & {
+  canRequest: boolean;
+  canWrite: boolean;
+  groups: CurriculumGroup[];
+  initialFilters: CurriculumFilters;
+  principalCount: number;
+  stats: CurriculumStats;
+  totalCount: number;
+  truncated: boolean;
+};
+
+type Preset = {
+  classId: string;
+  streamId: string | null;
+  subjectId: string;
+  yearId: string;
+};
+
+const statusOptions = [
+  { label: "All", value: "all" },
+  { label: "Below minimum", value: "below" },
+  { label: "Meeting minimum", value: "meeting" },
+  { label: "Locked", value: "locked" },
+  { label: "School", value: "school" },
+];
+
+const buildQuery = (values: CurriculumFilters): string => {
+  const params = new URLSearchParams();
+  if (values.search.trim()) params.set("search", values.search.trim());
+  if (values.yearId !== "all") params.set("yearId", values.yearId);
+  if (values.classId !== "all") params.set("classId", values.classId);
+  if (values.subjectId !== "all") params.set("subjectId", values.subjectId);
+  if (values.streamId !== "all") params.set("streamId", values.streamId);
+  if (values.status !== "all") params.set("status", values.status);
+  const text = params.toString();
+  return text ? `?${text}` : "";
+};
+
+const CurriculumUnitDialog = ({
+  buttonLabel,
+  canWrite,
+  preset,
+  unit,
+  dialogData,
+}: {
+  buttonLabel?: string;
+  canWrite: boolean;
+  preset?: Preset | null;
+  unit?: CurriculumRow | null;
+  dialogData: DialogData;
 }) => {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(unit);
+  const { classes, classSubjects, streams, streamSubjects, subjects, years } =
+    dialogData;
 
   const {
     control,
@@ -136,12 +208,12 @@ const CurriculumUnitDialog = ({
     formState: { errors, isDirty, isSubmitting },
   } = useForm<curriculumUnitType>({
     defaultValues: {
-      classId: unit?.classId ?? "",
+      classId: unit?.classId ?? preset?.classId ?? "",
       objectives: unit?.objectives ?? "",
-      streamId: unit?.streamId ?? null,
-      subjectId: unit?.subjectId ?? "",
+      streamId: unit?.streamId ?? preset?.streamId ?? null,
+      subjectId: unit?.subjectId ?? preset?.subjectId ?? "",
       title: unit?.title ?? "",
-      yearId: unit?.yearId ?? "",
+      yearId: unit?.yearId ?? preset?.yearId ?? "",
     },
     mode: "all",
     resolver: zodResolver(curriculumUnitSchema),
@@ -194,23 +266,16 @@ const CurriculumUnitDialog = ({
       if (current) return [...scoped, current];
     }
     return scoped;
-  }, [
-    classId,
-    classSubjects,
-    streamId,
-    streamSubjects,
-    subjects,
-    unit?.subjectId,
-  ]);
+  }, [classId, classSubjects, streamId, streamSubjects, subjects, unit]);
 
   const openDialog = () => {
     reset({
-      classId: unit?.classId ?? "",
+      classId: unit?.classId ?? preset?.classId ?? "",
       objectives: unit?.objectives ?? "",
-      streamId: unit?.streamId ?? null,
-      subjectId: unit?.subjectId ?? "",
+      streamId: unit?.streamId ?? preset?.streamId ?? null,
+      subjectId: unit?.subjectId ?? preset?.subjectId ?? "",
       title: unit?.title ?? "",
-      yearId: unit?.yearId ?? yearId ?? "",
+      yearId: unit?.yearId ?? preset?.yearId ?? yearId ?? "",
     });
     setOpen(true);
   };
@@ -241,11 +306,11 @@ const CurriculumUnitDialog = ({
       <Button
         disabled={!canWrite}
         onClick={openDialog}
-        size={isEdit ? "sm" : "default"}
+        size={isEdit || buttonLabel ? "sm" : "default"}
         type="button"
-        variant={isEdit ? "outline" : "default"}
+        variant={isEdit || buttonLabel ? "outline" : "default"}
         title={canWrite ? undefined : "Principal only"}>
-        {isEdit ? "Edit" : "New unit"}
+        {isEdit ? "Edit" : (buttonLabel ?? "New unit")}
       </Button>
       <Dialog
         open={open}
@@ -607,14 +672,14 @@ const CurriculumMinimumDialog = ({
         type="button"
         variant="outline"
         title={canWrite ? undefined : "Principal only"}>
-        Set minimum
+        Coverage rules
       </Button>
       <Dialog
         open={open}
         onOpenChange={setOpen}>
         <DialogContent className="max-h-[calc(100%-2rem)] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Set minimum</DialogTitle>
+            <DialogTitle>Coverage rules</DialogTitle>
             <DialogDescription>
               Principal minimums for Nursery to Class 8 only,{" "}
               {MIN_CURRICULUM_MINIMUM} to {MAX_CURRICULUM_MINIMUM}. System floor
@@ -1185,284 +1250,586 @@ const MoveButtons = ({ unit }: { unit: CurriculumRow }) => {
   if (unit.isLocked) return null;
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex gap-1">
-        <Button
-          disabled={!unit.canWrite || busy}
-          size="sm"
-          type="button"
-          variant="outline"
-          onClick={() => move("up")}
-          aria-label={`Move ${unit.title} up`}
-          title={
-            unit.canWrite ? "Move earlier in teaching order" : "Principal only"
-          }>
-          Up
-        </Button>
-        <Button
-          disabled={!unit.canWrite || busy}
-          size="sm"
-          type="button"
-          variant="outline"
-          onClick={() => move("down")}
-          aria-label={`Move ${unit.title} down`}
-          title={
-            unit.canWrite ? "Move later in teaching order" : "Principal only"
-          }>
-          Down
-        </Button>
-      </div>
+    <div className="flex items-center gap-1">
+      <Button
+        disabled={!unit.canWrite || busy}
+        size="sm"
+        type="button"
+        variant="outline"
+        onClick={() => move("up")}
+        aria-label={`Move ${unit.title} earlier`}
+        title={
+          unit.canWrite ? "Move earlier in teaching order" : "Principal only"
+        }>
+        Up
+      </Button>
+      <Button
+        disabled={!unit.canWrite || busy}
+        size="sm"
+        type="button"
+        variant="outline"
+        onClick={() => move("down")}
+        aria-label={`Move ${unit.title} later`}
+        title={
+          unit.canWrite ? "Move later in teaching order" : "Principal only"
+        }>
+        Down
+      </Button>
       {error ?
-        <p
+        <span
           role="alert"
           className="text-destructive text-xs">
           {error}
-        </p>
+        </span>
       : null}
     </div>
   );
 };
 
-const getCurriculumColumns = (principalCount: number) =>
-  columnHelper.columns([
-    columnHelper.accessor("order", {
-      cell: ({ getValue }) => <span className="font-medium">{getValue()}</span>,
-      header: ({ column }) => (
-        <DataTableSortButton
-          column={column}
-          label="Order"
-        />
-      ),
-    }),
-    columnHelper.accessor("title", {
-      cell: ({ getValue, row }) => (
-        <div className="flex flex-col gap-1">
-          <span className="font-medium">{getValue()}</span>
-          <span className="text-muted-foreground text-xs">
-            {row.original.yearName} plus {row.original.className} plus{" "}
-            {row.original.streamName}
-          </span>
-        </div>
-      ),
-      header: ({ column }) => (
-        <DataTableSortButton
-          column={column}
-          label="Title"
-        />
-      ),
-    }),
-    columnHelper.accessor("subjectName", {
-      cell: ({ getValue }) => <span>{getValue()}</span>,
-      header: "Subject",
-    }),
-    columnHelper.accessor("source", {
-      cell: ({ getValue }) =>
-        getValue() === "CBSE_LOCKED" ?
-          <Badge>Locked</Badge>
-        : <Badge variant="outline">School</Badge>,
-      header: "Source",
-    }),
-    columnHelper.accessor("current", {
-      cell: ({ getValue, row }) => (
-        <span className="text-muted-foreground">
-          {getValue()}/{row.original.required} units
+const SortableUnitRow = ({
+  canReorder,
+  dialogData,
+  index,
+  principalCount,
+  unit,
+}: {
+  canReorder: boolean;
+  dialogData: DialogData;
+  index: number;
+  principalCount: number;
+  unit: CurriculumRow;
+}) => {
+  const {
+    attributes,
+    isDragging,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ disabled: !canReorder || unit.isLocked, id: unit.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        opacity: isDragging ? 0.6 : 1,
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className="flex items-center gap-3 rounded-lg border px-3 py-2">
+      <div className="flex items-center gap-2">
+        {canReorder && !unit.isLocked ?
+          <button
+            type="button"
+            aria-label={`Drag ${unit.title} to reorder`}
+            className="text-muted-foreground hover:text-foreground flex size-7 shrink-0 cursor-grab items-center justify-center rounded active:cursor-grabbing"
+            {...listeners}
+            {...attributes}>
+            <GripVerticalIcon
+              aria-hidden="true"
+              className="size-4"
+            />
+          </button>
+        : null}
+        <span className="bg-muted flex size-6 items-center justify-center rounded-full text-xs font-medium">
+          {index + 1}
         </span>
-      ),
-      header: "Coverage",
-    }),
-    columnHelper.display({
-      cell: ({ row }) => <MoveButtons unit={row.original} />,
-      header: "Order",
-      id: "move",
-    }),
-    columnHelper.display({
-      cell: ({ row }) =>
-        row.original.isLocked ?
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate font-medium">{unit.title}</span>
+        <span className="text-muted-foreground text-xs">
+          {unit.isLocked ? "Locked by principal" : "School unit"}
+        </span>
+      </div>
+      {unit.isLocked ?
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge variant="outline">Locked</Badge>
           <LockedEditDialog
-            canRequest={row.original.canRequest}
+            canRequest={unit.canRequest}
             principalCount={principalCount}
-            unit={row.original}
+            unit={unit}
           />
-        : <span className="text-muted-foreground text-xs">
-            See cards below for edit.
-          </span>,
-      header: "Locked flow",
-      id: "locked",
+        </div>
+      : <div className="flex shrink-0 items-center gap-1">
+          <MoveButtons unit={unit} />
+          <CurriculumUnitDialog
+            canWrite={unit.canWrite}
+            dialogData={dialogData}
+            unit={unit}
+          />
+        </div>
+      }
+    </div>
+  );
+};
+
+const GroupCard = ({
+  canRequest,
+  canWrite,
+  dialogData,
+  group,
+  principalCount,
+}: {
+  canRequest: boolean;
+  canWrite: boolean;
+  dialogData: DialogData;
+  group: CurriculumGroup;
+  principalCount: number;
+}) => {
+  const router = useRouter();
+  // Reset via parent key (group.key + unit order signature), so no
+  // render-phase or effect sync is needed here.
+  const [items, setItems] = useState<CurriculumRow[]>(group.units);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 8 },
     }),
-  ]);
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const lockedClass = isLockedClassOrder(group.classOrder);
+  const canReorder =
+    canWrite && !lockedClass && group.units.every((unit) => !unit.isLocked);
+
+  const below = group.current < group.required;
+  const percent = Math.min(
+    100,
+    Math.round((group.current / Math.max(1, group.required)) * 100),
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = items.findIndex((row) => row.id === active.id);
+    const newIndex = items.findIndex((row) => row.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = arrayMove(items, oldIndex, newIndex);
+    setItems(next);
+    setError(null);
+    setSaving(true);
+    try {
+      const result = await withMinimumLoad(
+        reorderCurriculumUnits({
+          classId: group.classId,
+          streamId: group.streamId,
+          subjectId: group.subjectId,
+          unitIds: next.map((row) => row.id),
+          yearId: group.yearId,
+        }),
+      );
+      if (!result.ok) {
+        setItems(group.units);
+        setError(result.errors.root ?? "Could not save new order.");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col">
+            <span className="font-medium">
+              {`${group.className} - ${group.subjectShort} (${group.subjectCode})`}
+            </span>
+            <span className="text-muted-foreground text-xs">
+              {group.streamName}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="bg-muted h-2 w-28 overflow-hidden rounded-full">
+              <div
+                className={below ? "h-2 bg-amber-500" : "h-2 bg-emerald-500"}
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+            <span className="text-muted-foreground text-xs whitespace-nowrap">
+              {`${group.current} of ${group.required} units`}
+            </span>
+            {below ?
+              <Badge variant="outline">Below minimum</Badge>
+            : <Badge>Meeting minimum</Badge>}
+          </div>
+        </div>
+        {canReorder ?
+          <p className="text-muted-foreground text-xs">
+            Drag by the grip to reorder teaching sequence. Up and Down remain
+            for keyboard control.
+            {saving ? " Saving new order." : ""}
+          </p>
+        : lockedClass ?
+          <p className="text-muted-foreground text-xs">
+            Locked sequence. Edits need approval.
+          </p>
+        : null}
+        {error ?
+          <p
+            role="alert"
+            className="bg-destructive/10 text-destructive rounded-lg px-3.5 py-2.5 text-[13.5px] leading-relaxed">
+            {error}
+          </p>
+        : null}
+        <DndContext
+          id={`curriculum-${group.key}`}
+          sensors={sensors}
+          onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={items.map((row) => row.id)}
+            strategy={verticalListSortingStrategy}>
+            <div className="flex flex-col gap-2">
+              {items.map((unit, index) => (
+                <SortableUnitRow
+                  key={unit.id}
+                  canReorder={canReorder}
+                  dialogData={dialogData}
+                  index={index}
+                  principalCount={principalCount}
+                  unit={{
+                    ...unit,
+                    canRequest,
+                    canWrite,
+                  }}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+        <div className="flex flex-wrap items-center gap-2">
+          {!lockedClass ?
+            <CurriculumUnitDialog
+              buttonLabel={`Add unit to ${group.className} - ${group.subjectShort}`}
+              canWrite={canWrite}
+              dialogData={dialogData}
+              preset={{
+                classId: group.classId,
+                streamId: group.streamId,
+                subjectId: group.subjectId,
+                yearId: group.yearId,
+              }}
+            />
+          : null}
+          {group.units.some((unit) => unit.isLocked) ?
+            <span className="text-muted-foreground text-xs">
+              Edits to locked units go to Approvals.{" "}
+              <Link
+                className="text-primary font-medium underline-offset-4 hover:underline"
+                href={"/dashboard/academics/approvals" as Route}>
+                View approvals
+              </Link>
+            </span>
+          : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 const CurriculumList = ({
+  canRequest,
   canWrite,
   classes,
   classSubjects,
-  dir,
-  page,
-  pageSize,
+  groups,
+  initialFilters,
   principalCount,
-  rows,
-  sort,
-  streams,
+  stats,
   streamSubjects,
+  streams,
   subjects,
-  total,
-  totalPages,
+  totalCount,
+  truncated,
   years,
 }: CurriculumListProps) => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const columns = useMemo(
-    () => getCurriculumColumns(principalCount),
-    [principalCount],
+  const dialogData: DialogData = useMemo(
+    () => ({
+      classes,
+      classSubjects,
+      streams,
+      streamSubjects,
+      subjects,
+      years,
+    }),
+    [classes, classSubjects, streams, streamSubjects, subjects, years],
   );
 
-  const table = useLegacyTable({
-    autoResetPageIndex: false,
-    columns,
-    data: rows,
-    getCoreRowModel: getCoreRowModel(),
-    getRowId: (row) => row.id,
-    manualPagination: true,
-    manualSorting: true,
-    onSortingChange: (updater) => {
-      const current = [{ desc: dir === "desc", id: sort }];
-      const next = typeof updater === "function" ? updater(current) : updater;
-      const first = next[0];
-      const params = new URLSearchParams(searchParams.toString());
-      if (first && (first.id !== "order" || first.desc)) {
-        params.set("sort", first.id);
-        params.set("dir", first.desc ? "desc" : "asc");
-      } else {
-        params.delete("sort");
-        params.delete("dir");
-      }
-      params.set("page", "1");
-      router.replace(`${pathname}?${params.toString()}` as Route);
-    },
-    pageCount: totalPages,
-    state: {
-      pagination: { pageIndex: page - 1, pageSize },
-      sorting: [{ desc: dir === "desc", id: sort }],
-    },
-  });
+  const urlSearch = (searchParams.get("search") ?? initialFilters.search)
+    .trim()
+    .slice(0, 100);
+  const [search, setSearch] = useState(initialFilters.search);
+  const [prevUrlSearch, setPrevUrlSearch] = useState(urlSearch);
+  // Render-time guard (not useEffect) so external URL changes sync the
+  // input without tripping react-hooks/set-state-in-effect.
+  if (prevUrlSearch !== urlSearch) {
+    setPrevUrlSearch(urlSearch);
+    setSearch(urlSearch);
+  }
 
-  const goPage = (nextPage: number) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page", String(nextPage));
-    router.replace(`${pathname}?${params.toString()}` as Route);
+  const yearId = searchParams.get("yearId") ?? initialFilters.yearId;
+  const classId = searchParams.get("classId") ?? initialFilters.classId;
+  const subjectId = searchParams.get("subjectId") ?? initialFilters.subjectId;
+  const streamId = searchParams.get("streamId") ?? initialFilters.streamId;
+  const status = searchParams.get("status") ?? initialFilters.status;
+
+  useEffect(() => {
+    if (search.trim() === urlSearch) return;
+    const timer = setTimeout(() => {
+      router.replace(
+        `${pathname}${buildQuery({ classId, search: search.trim(), status, streamId, subjectId, yearId })}` as Route,
+      );
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [
+    search,
+    urlSearch,
+    classId,
+    status,
+    streamId,
+    subjectId,
+    yearId,
+    pathname,
+    router,
+  ]);
+
+  const updateFilters = (next: Partial<CurriculumFilters>) => {
+    router.replace(
+      `${pathname}${buildQuery({
+        classId,
+        search: search.trim(),
+        status,
+        streamId,
+        subjectId,
+        yearId,
+        ...next,
+      })}` as Route,
+    );
   };
+
+  const hasFilter =
+    search.trim() !== "" ||
+    yearId !== "all" ||
+    classId !== "all" ||
+    subjectId !== "all" ||
+    streamId !== "all" ||
+    status !== "all";
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardContent className="sm:flex-row sm:items-end sm:gap-4">
-          <div className="flex flex-1 flex-col gap-2">
+      {truncated ?
+        <p
+          role="alert"
+          className="bg-destructive/10 text-destructive rounded-lg px-3.5 py-2.5 text-[13.5px] leading-relaxed">
+          {`Showing first ${groups.reduce((sum, group) => sum + group.units.length, 0)} of ${totalCount} units. Narrow filters to see the rest.`}
+        </p>
+      : null}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <CurriculumMinimumDialog
+          canWrite={canWrite}
+          classes={classes}
+          classSubjects={classSubjects}
+          subjects={subjects.map((row) => ({
+            id: row.id,
+            name: `${row.name} (${row.code})`,
+          }))}
+          years={years}
+        />
+        <CurriculumUnitDialog
+          canWrite={canWrite}
+          dialogData={dialogData}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Card>
+          <CardContent className="flex flex-col">
+            <span className="text-2xl font-semibold">{stats.total}</span>
+            <span className="text-muted-foreground text-xs">
+              {`Units in ${stats.yearLabel}`}
+            </span>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex flex-col">
+            <span className="text-2xl font-semibold text-amber-600">
+              {stats.below}
+            </span>
+            <span className="text-muted-foreground text-xs">
+              Subjects below minimum
+            </span>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex flex-col">
+            <span className="text-2xl font-semibold text-emerald-600">
+              {stats.meeting}
+            </span>
+            <span className="text-muted-foreground text-xs">
+              Subjects meeting minimum
+            </span>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex flex-col">
+            <span className="text-2xl font-semibold">{stats.locked}</span>
+            <span className="text-muted-foreground text-xs">Locked units</span>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 rounded-xl border p-4 sm:grid-cols-2 lg:grid-cols-6">
+        <Field className="lg:col-span-1">
+          <FieldLabel htmlFor="curriculum-search">Search</FieldLabel>
+          <Input
+            id="curriculum-search"
+            type="search"
+            autoComplete="off"
+            placeholder="Unit title"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="curriculum-year">Year</FieldLabel>
+          <NativeSelect
+            id="curriculum-year"
+            value={yearId}
+            onChange={(event) => updateFilters({ yearId: event.target.value })}>
+            <NativeSelectOption value="all">All years</NativeSelectOption>
+            {years.map((year) => (
+              <NativeSelectOption
+                key={year.id}
+                value={year.id}>
+                {year.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="curriculum-class">Class</FieldLabel>
+          <NativeSelect
+            id="curriculum-class"
+            value={classId}
+            onChange={(event) =>
+              updateFilters({ classId: event.target.value })
+            }>
+            <NativeSelectOption value="all">All classes</NativeSelectOption>
+            {classes.map((schoolClass) => (
+              <NativeSelectOption
+                key={schoolClass.id}
+                value={schoolClass.id}>
+                {schoolClass.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="curriculum-subject">Subject</FieldLabel>
+          <NativeSelect
+            id="curriculum-subject"
+            value={subjectId}
+            onChange={(event) =>
+              updateFilters({ subjectId: event.target.value })
+            }>
+            <NativeSelectOption value="all">All subjects</NativeSelectOption>
+            {subjects.map((subject) => (
+              <NativeSelectOption
+                key={subject.id}
+                value={subject.id}>
+                {`${subject.name} (${subject.code})`}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="curriculum-stream">Stream</FieldLabel>
+          <NativeSelect
+            id="curriculum-stream"
+            value={streamId}
+            onChange={(event) =>
+              updateFilters({ streamId: event.target.value })
+            }>
+            <NativeSelectOption value="all">All streams</NativeSelectOption>
+            <NativeSelectOption value="none">No stream</NativeSelectOption>
+            {streams.map((stream) => (
+              <NativeSelectOption
+                key={stream.id}
+                value={stream.id}>
+                {stream.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="curriculum-status">Status</FieldLabel>
+          <NativeSelect
+            id="curriculum-status"
+            value={status}
+            onChange={(event) => updateFilters({ status: event.target.value })}>
+            {statusOptions.map((option) => (
+              <NativeSelectOption
+                key={option.value}
+                value={option.value}>
+                {option.label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <p className="text-muted-foreground text-sm">
+          {groups.length === 0 ?
+            "No curriculum groups match these filters."
+          : `Showing ${groups.length} groups with ${groups.reduce((sum, group) => sum + group.units.length, 0)} units.`
+          }
+        </p>
+        {hasFilter ?
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => router.replace(pathname as Route)}>
+            Clear filters
+          </Button>
+        : null}
+      </div>
+
+      {groups.length === 0 ?
+        <Card>
+          <CardContent>
             <p className="text-muted-foreground text-sm">
-              Coverage shows current units against required floor plus principal
-              minimum. Use Up and Down to reorder teaching sequence. Locked rows
-              need approval.
+              No curriculum units match these filters. Try clearing filters or
+              adding a unit.
             </p>
-            <div className="flex flex-wrap gap-2">
-              <CurriculumUnitDialog
-                canWrite={canWrite}
-                classes={classes}
-                classSubjects={classSubjects}
-                streams={streams}
-                streamSubjects={streamSubjects}
-                subjects={subjects}
-                years={years}
-              />
-              <CurriculumMinimumDialog
-                canWrite={canWrite}
-                classes={classes}
-                classSubjects={classSubjects}
-                subjects={subjects.map((row) => ({
-                  id: row.id,
-                  name: `${row.name} (${row.code})`,
-                }))}
-                years={years}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      <div className="overflow-hidden rounded-xl border">
-        <DataTable
-          emptyMessage="No curriculum units match these filters."
-          minWidthClass="min-w-[860px]"
-          table={table}
-        />
-        <DataTablePagination
-          onNext={() => goPage(Math.min(totalPages, page + 1))}
-          onPrevious={() => goPage(Math.max(1, page - 1))}
-          page={page}
-          pageLabel={`Showing ${rows.length} of ${total} units. Page ${page} of ${totalPages}.`}
-          totalPages={totalPages}
-        />
-      </div>
-      <div className="flex flex-col gap-3">
-        {rows
-          .filter((row) => !row.isLocked)
-          .slice(0, 10)
-          .map((row) => (
-            <Card key={row.id}>
-              <CardContent className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-col">
-                  <span className="font-medium">
-                    {row.order}. {row.title}
-                  </span>
-                  <span className="text-muted-foreground text-sm">
-                    {row.yearName} plus {row.className} plus {row.subjectName}{" "}
-                    plus {row.streamName} plus {row.current}/{row.required}
-                  </span>
-                  {row.objectives ?
-                    <span className="text-sm">{row.objectives}</span>
-                  : null}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <MoveButtons unit={row} />
-                  <CurriculumUnitDialog
-                    canWrite={canWrite}
-                    classes={classes}
-                    classSubjects={classSubjects}
-                    streams={streams}
-                    streamSubjects={streamSubjects}
-                    subjects={subjects}
-                    unit={row}
-                    years={years}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+          </CardContent>
+        </Card>
+      : <div className="flex flex-col gap-4">
+          {groups.map((group) => (
+            <GroupCard
+              key={`${group.key}:${group.units
+                .map((row) => `${row.id}:${row.order}`)
+                .join(",")}`}
+              canRequest={canRequest}
+              canWrite={canWrite}
+              dialogData={dialogData}
+              group={group}
+              principalCount={principalCount}
+            />
           ))}
-        {rows
-          .filter((row) => row.isLocked)
-          .slice(0, 10)
-          .map((row) => (
-            <Card key={row.id}>
-              <CardContent className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-col">
-                  <span className="font-medium">
-                    {row.order}. {row.title}
-                  </span>
-                  <span className="text-muted-foreground text-sm">
-                    {row.yearName} plus {row.className} plus {row.subjectName}{" "}
-                    plus {row.streamName} plus {row.current}/{row.required} plus
-                    Locked
-                  </span>
-                  {row.objectives ?
-                    <span className="text-sm">{row.objectives}</span>
-                  : null}
-                </div>
-                <LockedEditDialog
-                  canRequest={row.canRequest}
-                  principalCount={principalCount}
-                  unit={row}
-                />
-              </CardContent>
-            </Card>
-          ))}
-      </div>
+        </div>
+      }
     </div>
   );
 };

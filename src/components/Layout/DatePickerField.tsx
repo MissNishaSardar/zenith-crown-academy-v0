@@ -16,6 +16,7 @@ type DatePickerFieldProps = {
   ariaInvalid?: boolean;
   disabled?: boolean;
   id: string;
+  minDate?: string;
   name?: string;
   onBlur?: () => void;
   onChange: (next: string) => void;
@@ -38,6 +39,7 @@ const DatePickerField = ({
   ariaInvalid,
   disabled,
   id,
+  minDate,
   name,
   onBlur,
   onChange,
@@ -46,6 +48,20 @@ const DatePickerField = ({
 }: DatePickerFieldProps) => {
   const [open, setOpen] = useState(false);
   const selected = useMemo(() => parseKey(value), [value]);
+  const minDay = useMemo(
+    () => (minDate ? parseKey(minDate) : undefined),
+    [minDate],
+  );
+
+  const calendarDisabled = useMemo(() => {
+    if (disabled) return true;
+    if (minDay) {
+      const cutoff = new Date(minDay);
+      cutoff.setHours(0, 0, 0, 0);
+      return { before: cutoff };
+    }
+    return undefined;
+  }, [disabled, minDay]);
 
   const handleSelect = (next: Date | undefined) => {
     onChange(next ? format(next, "yyyy-MM-dd") : "");
@@ -78,8 +94,8 @@ const DatePickerField = ({
           className="w-auto p-0">
           <Calendar
             captionLayout="dropdown"
-            defaultMonth={selected}
-            disabled={disabled}
+            defaultMonth={selected ?? minDay}
+            disabled={calendarDisabled}
             mode="single"
             onSelect={handleSelect}
             selected={selected}

@@ -3,37 +3,25 @@ import type { Metadata } from "next";
 import { BreadcrumbTrail } from "@/components/Layout/Breadcrumbs";
 import PageHeader from "@/components/Layout/PageHeader";
 import CurriculumList, {
+  type CurriculumGroup,
   type CurriculumRow,
+  type CurriculumStats,
 } from "@/components/Academics/CurriculumList";
-import { Button } from "@/components/shadcnui/button";
-import { Field, FieldLabel } from "@/components/shadcnui/field";
-import { Input } from "@/components/shadcnui/input";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/shadcnui/native-select";
 import { getAcademicsTrail } from "@/lib/dashboard-nav";
-import { can, parseRoleNames } from "@/lib/auth/permissions";
+import { can } from "@/lib/auth/permissions";
 import prisma from "@/lib/dbClient/prisma";
-import {
-  curriculumSourceNames,
-  SYSTEM_CURRICULUM_FLOOR,
-} from "@/lib/zodSchema";
+import { parseRoleNames } from "@/lib/auth/permissions";
+import { SYSTEM_CURRICULUM_FLOOR } from "@/lib/zodSchema";
 import { getFreshRoleContext, requirePermission } from "@/server/guards";
 
 export const metadata: Metadata = {
   title: "Curriculum",
 };
 
-const PAGE_SIZE = 10;
-
 type SearchParams = {
   classId?: string | string[] | undefined;
-  dir?: string | string[] | undefined;
-  page?: string | string[] | undefined;
   search?: string | string[] | undefined;
-  source?: string | string[] | undefined;
-  sort?: string | string[] | undefined;
+  status?: string | string[] | undefined;
   streamId?: string | string[] | undefined;
   subjectId?: string | string[] | undefined;
   yearId?: string | string[] | undefined;
@@ -45,6 +33,10 @@ type PageProps = {
 
 const firstParam = (value: string | string[] | undefined): string =>
   Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+
+const statusOptions = ["all", "below", "meeting", "locked", "school"] as const;
+
+type StatusParam = (typeof statusOptions)[number];
 
 const CurriculumPage = async ({ searchParams }: PageProps) => {
   const session = await requirePermission("academic:view");
@@ -60,17 +52,11 @@ const CurriculumPage = async ({ searchParams }: PageProps) => {
   const classParam = firstParam(raw.classId);
   const subjectParam = firstParam(raw.subjectId);
   const streamParam = firstParam(raw.streamId);
-  const sourceParam = firstParam(raw.source);
-  const source =
-    (curriculumSourceNames as readonly string[]).includes(sourceParam) ?
-      sourceParam
+  const statusRaw = firstParam(raw.status);
+  const status: StatusParam =
+    (statusOptions as readonly string[]).includes(statusRaw) ?
+      (statusRaw as StatusParam)
     : "all";
-  const parsedPage = Number.parseInt(firstParam(raw.page), 10);
-  const requestedPage =
-    Number.isFinite(parsedPage) && parsedPage >= 1 ? parsedPage : 1;
-  const sortParam = firstParam(raw.sort);
-  const sort = sortParam === "title" ? "title" : "order";
-  const dir = firstParam(raw.dir) === "desc" ? "desc" : "asc";
 
   const years = await prisma.academicYear.findMany({
     orderBy: [{ name: "asc" }],
@@ -95,7 +81,6 @@ const CurriculumPage = async ({ searchParams }: PageProps) => {
     select: { streamId: true, subjectId: true },
   });
 
-  const where: { AND?: object[] } = {};
   const clauses: object[] = [];
   if (yearParam && yearParam !== "all") clauses.push({ yearId: yearParam });
   if (classParam && classParam !== "all") clauses.push({ classId: classParam });
@@ -109,28 +94,32 @@ const CurriculumPage = async ({ searchParams }: PageProps) => {
       clauses.push({ streamId: streamParam });
     }
   }
-  if (source !== "all") clauses.push({ source });
   if (search) {
     clauses.push({ title: { contains: search } });
   }
-  if (clauses.length > 0) where.AND = clauses;
+  const where = clauses.length > 0 ? { AND: clauses } : {};
 
-  const total = await prisma.curriculumUnit.count({ where });
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const page = Math.min(requestedPage, totalPages);
-
-  const units = await prisma.curriculumUnit.findMany({
-    include: {
-      class: { select: { name: true, order: true } },
-      stream: { select: { name: true } },
-      subject: { select: { code: true, name: true } },
-      year: { select: { name: true } },
-    },
-    orderBy: [{ [sort]: dir }, { id: "asc" }],
-    skip: (page - 1) * PAGE_SIZE,
-    take: PAGE_SIZE,
-    where,
-  });
+  const CURRICULUM_LIMIT = 500;
+  const [matchingUnits, units] = await Promise.all([
+    prisma.curriculumUnit.count({ where }),
+    prisma.curriculumUnit.findMany({
+      include: {
+        class: { select: { name: true, order: true } },
+        stream: { select: { name: true } },
+        subject: { select: { code: true, name: true } },
+        year: { select: { name: true } },
+      },
+      orderBy: [
+        { class: { order: "asc" } },
+        { subject: { name: "asc" } },
+        { order: "asc" },
+        { id: "asc" },
+      ],
+      take: CURRICULUM_LIMIT,
+      where,
+    }),
+  ]);
+  const truncated = matchingUnits > units.length;
 
   const minimums = await prisma.curriculumMinimum.findMany({
     select: { classId: true, minUnits: true, subjectId: true, yearId: true },
@@ -139,25 +128,6 @@ const CurriculumPage = async ({ searchParams }: PageProps) => {
     minimums.map((row) => [
       `${row.yearId}:${row.classId}:${row.subjectId}`,
       row.minUnits,
-    ]),
-  );
-
-  const counts = await prisma.curriculumUnit.groupBy({
-    _count: { _all: true },
-    by: ["yearId", "classId", "subjectId"],
-    where: (() => {
-      // Coverage stays unfiltered by title search so the required floor
-      // does not look under-covered while searching.
-      const coverageClauses = clauses.filter(
-        (clause) => !("title" in (clause as Record<string, unknown>)),
-      );
-      return coverageClauses.length > 0 ? { AND: coverageClauses } : {};
-    })(),
-  });
-  const countByKey = new Map(
-    counts.map((row) => [
-      `${row.yearId}:${row.classId}:${row.subjectId}`,
-      row._count._all,
     ]),
   );
 
@@ -198,7 +168,6 @@ const CurriculumPage = async ({ searchParams }: PageProps) => {
       classId: unit.classId,
       className: unit.class.name,
       classOrder: unit.class.order,
-      current: countByKey.get(key) ?? 0,
       id: unit.id,
       isLocked: unit.source === "CBSE_LOCKED",
       objectives: unit.objectives,
@@ -210,131 +179,124 @@ const CurriculumPage = async ({ searchParams }: PageProps) => {
       streamName: unit.stream?.name ?? "No stream",
       subjectId: unit.subjectId,
       subjectName: `${unit.subject.name} (${unit.subject.code})`,
+      subjectShort: unit.subject.name,
+      subjectCode: unit.subject.code,
       title: unit.title,
       yearId: unit.yearId,
       yearName: unit.year.name,
     };
   });
 
+  const grouped = new Map<string, CurriculumGroup>();
+  for (const row of rows) {
+    const key = `${row.yearId}:${row.classId}:${row.subjectId}:${row.streamId ?? "none"}`;
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.units.push(row);
+      if (row.required > existing.required) existing.required = row.required;
+    } else {
+      grouped.set(key, {
+        classId: row.classId,
+        className: row.className,
+        classOrder: row.classOrder,
+        current: 0,
+        key,
+        required: row.required,
+        streamId: row.streamId,
+        streamName: row.streamName,
+        subjectCode: row.subjectCode,
+        subjectId: row.subjectId,
+        subjectName: row.subjectName,
+        subjectShort: row.subjectShort,
+        units: [row],
+        yearId: row.yearId,
+        yearName: row.yearName,
+      });
+    }
+  }
+
+  const baseGroups = [...grouped.values()].map((group) => ({
+    ...group,
+    current: group.units.length,
+    units: [...group.units].sort((a, b) => a.order - b.order),
+  }));
+  baseGroups.sort((a, b) => {
+    if (a.classOrder !== b.classOrder) return a.classOrder - b.classOrder;
+    if (a.className !== b.className)
+      return a.className.localeCompare(b.className);
+    if (a.subjectShort !== b.subjectShort)
+      return a.subjectShort.localeCompare(b.subjectShort);
+    if (a.yearName !== b.yearName) return a.yearName.localeCompare(b.yearName);
+    return a.streamName.localeCompare(b.streamName);
+  });
+
+  const totalUnits = baseGroups.reduce((sum, group) => sum + group.current, 0);
+  const lockedUnits = baseGroups.reduce(
+    (sum, group) => sum + group.units.filter((unit) => unit.isLocked).length,
+    0,
+  );
+  const below = baseGroups.filter(
+    (group) => group.current < group.required,
+  ).length;
+  const meeting = baseGroups.filter(
+    (group) => group.current >= group.required,
+  ).length;
+  const selectedYear = years.find((year) => year.id === yearParam);
+  const stats: CurriculumStats = {
+    below,
+    locked: lockedUnits,
+    meeting,
+    total: totalUnits,
+    yearLabel: selectedYear ? selectedYear.name : "All years",
+  };
+
+  const filteredGroups = baseGroups
+    .map((group) => {
+      if (status === "below" && !(group.current < group.required)) return null;
+      if (status === "meeting" && !(group.current >= group.required))
+        return null;
+      if (status === "locked") {
+        const lockedOnly = group.units.filter((unit) => unit.isLocked);
+        if (lockedOnly.length === 0) return null;
+        return { ...group, units: lockedOnly };
+      }
+      if (status === "school") {
+        const schoolOnly = group.units.filter((unit) => !unit.isLocked);
+        if (schoolOnly.length === 0) return null;
+        return { ...group, units: schoolOnly };
+      }
+      return group;
+    })
+    .filter((group) => group !== null);
+
   return (
     <div className="flex flex-1 flex-col gap-6">
       <BreadcrumbTrail items={getAcademicsTrail("Curriculum")} />
       <PageHeader
-        subtitle="Units with school control plus CBSE floor and board lock"
+        subtitle="Teaching sequence for each class and subject. Units must reach the minimum before the term can start."
         title="Curriculum"
       />
-      <form
-        className="flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:flex-wrap sm:items-end"
-        method="get">
-        <Field className="w-full sm:w-56">
-          <FieldLabel htmlFor="curriculum-search">Search</FieldLabel>
-          <Input
-            defaultValue={search}
-            id="curriculum-search"
-            maxLength={100}
-            name="search"
-            placeholder="Title contains"
-            type="search"
-          />
-        </Field>
-        <Field className="w-full sm:w-48">
-          <FieldLabel htmlFor="curriculum-year">Year</FieldLabel>
-          <NativeSelect
-            defaultValue={yearParam || "all"}
-            id="curriculum-year"
-            name="yearId">
-            <NativeSelectOption value="all">All years</NativeSelectOption>
-            {years.map((year) => (
-              <NativeSelectOption
-                key={year.id}
-                value={year.id}>
-                {year.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field className="w-full sm:w-48">
-          <FieldLabel htmlFor="curriculum-class">Class</FieldLabel>
-          <NativeSelect
-            defaultValue={classParam || "all"}
-            id="curriculum-class"
-            name="classId">
-            <NativeSelectOption value="all">All classes</NativeSelectOption>
-            {classes.map((schoolClass) => (
-              <NativeSelectOption
-                key={schoolClass.id}
-                value={schoolClass.id}>
-                {schoolClass.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field className="w-full sm:w-48">
-          <FieldLabel htmlFor="curriculum-subject">Subject</FieldLabel>
-          <NativeSelect
-            defaultValue={subjectParam || "all"}
-            id="curriculum-subject"
-            name="subjectId">
-            <NativeSelectOption value="all">All subjects</NativeSelectOption>
-            {subjects.map((subject) => (
-              <NativeSelectOption
-                key={subject.id}
-                value={subject.id}>
-                {`${subject.name} (${subject.code})`}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field className="w-full sm:w-48">
-          <FieldLabel htmlFor="curriculum-stream">Stream</FieldLabel>
-          <NativeSelect
-            defaultValue={streamParam || "all"}
-            id="curriculum-stream"
-            name="streamId">
-            <NativeSelectOption value="all">All streams</NativeSelectOption>
-            <NativeSelectOption value="none">No stream</NativeSelectOption>
-            {streams.map((stream) => (
-              <NativeSelectOption
-                key={stream.id}
-                value={stream.id}>
-                {stream.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field className="w-full sm:w-48">
-          <FieldLabel htmlFor="curriculum-source">Source</FieldLabel>
-          <NativeSelect
-            defaultValue={source === "all" ? "all" : source}
-            id="curriculum-source"
-            name="source">
-            <NativeSelectOption value="all">All sources</NativeSelectOption>
-            {curriculumSourceNames.map((option) => (
-              <NativeSelectOption
-                key={option}
-                value={option}>
-                {option}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Button type="submit">Apply filters</Button>
-      </form>
       <CurriculumList
+        canRequest={canRequest}
         canWrite={isManager}
         classes={classes}
         classSubjects={classSubjects}
-        dir={dir}
-        page={page}
-        pageSize={PAGE_SIZE}
+        groups={filteredGroups}
+        initialFilters={{
+          classId: classParam || "all",
+          search,
+          status,
+          streamId: streamParam || "all",
+          subjectId: subjectParam || "all",
+          yearId: yearParam || "all",
+        }}
         principalCount={principalCount}
-        rows={rows}
-        sort={sort}
-        streams={streams}
+        stats={stats}
         streamSubjects={streamSubjects}
+        streams={streams}
         subjects={subjects}
-        total={total}
-        totalPages={totalPages}
+        totalCount={matchingUnits}
+        truncated={truncated}
         years={years}
       />
     </div>

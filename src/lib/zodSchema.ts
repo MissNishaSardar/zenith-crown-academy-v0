@@ -199,14 +199,11 @@ const isValidCalendarDate = (value: string): boolean => {
   );
 };
 
+const toTodayKeyUTC = (): string => new Date().toISOString().slice(0, 10);
+
 const isTodayOrFutureDate = (value: string): boolean => {
-  const day = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(day.getTime())) {
-    return false;
-  }
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return day >= today;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return value >= toTodayKeyUTC();
 };
 
 export const banUserSchema = z
@@ -1481,3 +1478,222 @@ export const curriculumLockedEditRequestSchema = z.object({
 export type curriculumLockedEditRequestType = z.infer<
   typeof curriculumLockedEditRequestSchema
 >;
+
+export const examNameNames = [
+  "UNIT_TEST",
+  "HALF_YEARLY",
+  "ANNUAL",
+  "BOARD_PRELIM",
+] as const;
+
+export const examStatusNames = [
+  "DRAFT",
+  "SCHEDULED",
+  "PUBLISHED",
+  "LOCKED",
+  "FINALIZED",
+] as const;
+
+export const componentKindNames = ["THEORY", "PRACTICAL", "INTERNAL"] as const;
+
+export const EXAM_STATUS_ORDER: Record<string, number> = {
+  DRAFT: 0,
+  SCHEDULED: 1,
+  PUBLISHED: 2,
+  LOCKED: 3,
+  FINALIZED: 4,
+};
+
+export const examNameLabels: Record<string, string> = {
+  UNIT_TEST: "Unit test",
+  HALF_YEARLY: "Half yearly",
+  ANNUAL: "Annual",
+  BOARD_PRELIM: "Board prelim",
+};
+
+const examDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+const isValidExamDate = (value: string): boolean => {
+  const parts = value.split("-");
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day)
+  ) {
+    return false;
+  }
+  const date = new Date(year, month - 1, day);
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+};
+
+const marksDecimal = (field: string) =>
+  z
+    .number({ error: `Enter ${field}` })
+    .finite({ error: `Enter ${field}` })
+    .positive({ error: `${field} must be positive` })
+    .max(100000, { error: `${field} is too large` })
+    .refine((value) => Math.round(value * 100) / 100 === value, {
+      error: `${field} allows at most 2 decimals`,
+      path: [],
+    });
+
+const scoreDecimal = (field: string) =>
+  z
+    .number({ error: `Enter ${field}` })
+    .finite({ error: `Enter ${field}` })
+    .min(0, { error: `${field} cannot be negative` })
+    .max(100000, { error: `${field} is too large` })
+    .refine((value) => Math.round(value * 100) / 100 === value, {
+      error: `${field} allows at most 2 decimals`,
+      path: [],
+    });
+
+export const toMarksHundredths = (value: number): number =>
+  Math.round(value * 100);
+
+export const formatHundredths = (value: number): string => {
+  const text = (value / 100).toFixed(2);
+  return text.replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+};
+
+export const examSchema = z
+  .object({
+    classId: z.string().trim().max(100).nullable().optional(),
+    endDate: z
+      .string()
+      .trim()
+      .regex(examDatePattern, { error: "Use YYYY-MM-DD" })
+      .refine(isValidExamDate, { error: "Enter a valid end date" }),
+    name: z.enum(examNameNames, { error: "Pick a valid exam" }),
+    startDate: z
+      .string()
+      .trim()
+      .regex(examDatePattern, { error: "Use YYYY-MM-DD" })
+      .refine(isValidExamDate, { error: "Enter a valid start date" }),
+    streamId: z.string().trim().max(100).nullable().optional(),
+    yearId: z.string().min(1, { error: "Pick an academic year" }),
+  })
+  .superRefine((data, ctx) => {
+    if (data.startDate > data.endDate) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Start date must be on or before end date",
+        path: ["endDate"],
+      });
+    }
+  });
+
+export type examType = z.infer<typeof examSchema>;
+
+export const examPaperSchema = z
+  .object({
+    classId: z.string().min(1, { error: "Pick a class" }),
+    date: z
+      .string()
+      .trim()
+      .regex(examDatePattern, { error: "Use YYYY-MM-DD" })
+      .refine(isValidExamDate, { error: "Enter a valid date" }),
+    durationMin: z
+      .number({ error: "Enter duration" })
+      .int({ error: "Duration must be whole minutes" })
+      .min(1, { error: "Duration must be at least 1 minute" })
+      .max(600, { error: "Duration is too large" }),
+    examId: z.string().min(1, { error: "Missing exam" }),
+    maxMarks: marksDecimal("Max marks"),
+    passMarks: scoreDecimal("Pass marks"),
+    subjectId: z.string().min(1, { error: "Pick a subject" }),
+  })
+  .superRefine((data, ctx) => {
+    if (data.passMarks >= data.maxMarks) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Pass marks must be less than max marks",
+        path: ["passMarks"],
+      });
+    }
+  });
+
+export type examPaperType = z.infer<typeof examPaperSchema>;
+
+export const paperComponentSchema = z
+  .object({
+    kind: z.enum(componentKindNames, { error: "Pick a valid component" }),
+    maxMarks: marksDecimal("Max marks"),
+    passMarks: scoreDecimal("Pass marks"),
+  })
+  .superRefine((data, ctx) => {
+    if (data.passMarks >= data.maxMarks) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Pass must be less than max",
+        path: ["passMarks"],
+      });
+    }
+  });
+
+export type paperComponentType = z.infer<typeof paperComponentSchema>;
+
+export const paperComponentsSchema = z.object({
+  components: z
+    .array(paperComponentSchema)
+    .max(3, { error: "At most 3 components" }),
+  paperId: z.string().min(1, { error: "Missing paper" }),
+});
+
+export type paperComponentsType = z.infer<typeof paperComponentsSchema>;
+
+export const examTransitionSchema = z.object({
+  examId: z.string().min(1, { error: "Missing exam" }),
+  target: z.enum(examStatusNames, { error: "Pick a valid status" }),
+});
+
+export type examTransitionType = z.infer<typeof examTransitionSchema>;
+
+export const markStateNames = ["SCORED", "ABSENT", "EXEMPT"] as const;
+
+export const markStatusNames = ["DRAFT", "SUBMITTED", "APPROVED"] as const;
+
+export const markRowSchema = z
+  .object({
+    internalMarks: scoreDecimal("Internal marks").nullable().optional(),
+    practicalMarks: scoreDecimal("Practical marks").nullable().optional(),
+    state: z.enum(markStateNames, { error: "Pick a valid state" }),
+    studentId: z.string().min(1, { error: "Missing student" }),
+    theoryMarks: scoreDecimal("Theory marks").nullable().optional(),
+    totalMarks: scoreDecimal("Total marks").nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.state !== "SCORED") {
+      const hasValue =
+        data.theoryMarks != null ||
+        data.practicalMarks != null ||
+        data.internalMarks != null ||
+        data.totalMarks != null;
+      if (hasValue) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Absent or exempt rows store no scores",
+          path: ["totalMarks"],
+        });
+      }
+    }
+  });
+
+export type markRowType = z.infer<typeof markRowSchema>;
+
+export const marksEntrySchema = z.object({
+  paperId: z.string().min(1, { error: "Missing paper" }),
+  rows: z
+    .array(markRowSchema)
+    .min(1, { error: "Add at least one row" })
+    .max(300, { error: "Too many rows" }),
+});
+
+export type marksEntryType = z.infer<typeof marksEntrySchema>;
